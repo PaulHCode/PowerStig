@@ -241,6 +241,20 @@ URL or test its reachability or permissions.
 
 The generated definition uses `auditIfNotExists` to require a compliant
 `Microsoft.GuestConfiguration/guestConfigurationAssignments` resource.
+Its `details.name` must match the pinned generator's exact expression:
+`[concat('<package-name>$pid', uniqueString(policy().assignmentId, policy().definitionReferenceId))]`.
+The `$pid` portion is literal, not the authoring process ID. This is the
+Policy-created assignment name, not a bare package name or a wildcard.
+The helper strengthens GuestConfiguration 4.10.0's status-only template with
+an `allOf` that requires `Compliant` **and** the assignment's
+`guestConfiguration.name`, `guestConfiguration.version`, and
+`guestConfiguration.contentHash` to match the validated ZIP. Metadata is
+validated separately; metadata alone does not constrain the related-resource
+lookup. Missing/broad/unrelated names, status-only conditions and missing,
+duplicate, disjunctive or mismatched package conditions fail validation.
+These Policy aliases were confirmed against commercial Azure provider
+metadata; their availability still requires validation in each sovereign cloud.
+
 When the policy definition is published and assigned, Azure Machine
 Configuration uses the policy metadata to automatically create the guest
 assignment and deliver the package for evaluation. This helper only generates

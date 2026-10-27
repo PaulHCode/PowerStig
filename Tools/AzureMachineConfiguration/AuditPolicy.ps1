@@ -75,13 +75,10 @@ function Test-PowerStigAuditPolicyDefinition
         throw "Policy must audit Guest Configuration assignments; found '$($details['type'])'."
     }
 
-    if (
-        $details['existenceCondition']['field'] -cne
-        'Microsoft.GuestConfiguration/guestConfigurationAssignments/complianceStatus' -or
-        $details['existenceCondition']['equals'] -cne 'Compliant'
-    )
+    $expectedAssignmentName = "[concat('$($package.PackageName)`$pid', uniqueString(policy().assignmentId, policy().definitionReferenceId))]"
+    if ($details['name'] -isnot [string] -or $details['name'] -cne $expectedAssignmentName)
     {
-        throw 'Policy must require a compliant Guest Configuration assignment.'
+        throw 'Policy must target the exact Policy-derived Guest Configuration assignment name for this package.'
     }
 
     if (
@@ -106,6 +103,29 @@ function Test-PowerStigAuditPolicyDefinition
     if ($guestConfiguration['contentManagedIdentity'] -cne 'system')
     {
         throw 'Policy must use the system-assigned identity for package content.'
+    }
+
+    $existenceCondition = $details['existenceCondition']
+    $conditions = @($existenceCondition['allOf'])
+    $requiredConditions = Get-PowerStigAuditExistenceCondition -Package $package
+    if ($existenceCondition.Keys.Count -ne 1 -or $conditions.Count -ne $requiredConditions.allOf.Count)
+    {
+        throw 'Policy must require compliance and the exact configuration name, version and content hash in allOf.'
+    }
+
+    foreach ($requiredCondition in $requiredConditions.allOf)
+    {
+        $matchingConditions = @($conditions | Where-Object {
+            $_['field'] -is [string] -and $_['field'] -ceq $requiredCondition.field
+        })
+        if (
+            $matchingConditions.Count -ne 1 -or $matchingConditions[0].Keys.Count -ne 2 -or
+            $matchingConditions[0]['equals'] -isnot [string] -or
+            $matchingConditions[0]['equals'] -ine $requiredCondition.equals
+        )
+        {
+            throw "Policy must bind assignment field '$($requiredCondition.field)' to the validated Audit package."
+        }
     }
 
     [pscustomobject]@{
@@ -314,6 +334,14 @@ function New-PowerStigAuditPolicyDefinition
             throw 'GuestConfiguration completed without creating the expected policy definition.'
         }
 
+        # The pinned template checks status alone; also bind the evaluated assignment's package.
+        $generatedDefinition = Get-Content -LiteralPath $generatedPolicy.Path -Raw -ErrorAction Stop |
+            ConvertFrom-Json -AsHashtable -Depth 100 -ErrorAction Stop
+        $generatedDefinition['properties']['policyRule']['then']['details']['existenceCondition'] =
+            Get-PowerStigAuditExistenceCondition -Package $package
+        $generatedDefinition | ConvertTo-Json -Depth 100 |
+            Set-Content -LiteralPath $generatedPolicy.Path -Encoding utf8 -ErrorAction Stop
+
         $null = Test-PowerStigAuditPolicyDefinition `
             -PolicyPath $generatedPolicy.Path `
             -PackagePath $package.PackagePath `
@@ -344,6 +372,27 @@ function New-PowerStigAuditPolicyDefinition
         {
             Remove-Item -LiteralPath $stagingDirectory -Recurse -Force -ErrorAction Stop
         }
+    }
+}
+
+function Get-PowerStigAuditExistenceCondition
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [psobject]
+        $Package
+    )
+
+    $aliasPrefix = 'Microsoft.GuestConfiguration/guestConfigurationAssignments'
+    @{
+        allOf = @(
+            @{ field = "$aliasPrefix/complianceStatus"; equals = 'Compliant' }
+            @{ field = "$aliasPrefix/guestConfiguration.name"; equals = $Package.PackageName }
+            @{ field = "$aliasPrefix/guestConfiguration.version"; equals = $Package.Version }
+            @{ field = "$aliasPrefix/guestConfiguration.contentHash"; equals = $Package.PackageSha256 }
+        )
     }
 }
 

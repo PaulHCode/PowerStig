@@ -333,3 +333,30 @@ is not qualified.
   Configuration service uses the policy metadata to create the guest
   assignment after policy assignment. No package/policy publication,
   assignment, identity change, VM start, or guest execution has occurred.
+
+### 2026-10-27 - Exact-assignment policy review correction
+
+- Confirmed the review finding: the validator previously admitted a missing
+  related-resource name. GuestConfiguration 4.10.0's audit template does set
+  `details.name`, but its existence condition checks only compliance status.
+- Verified the pinned generator's
+  `New-GuestConfigurationPolicyGuestAssignmentNameReference` expression:
+  `[concat('<package-name>$pid', uniqueString(policy().assignmentId, policy().definitionReferenceId))]`.
+  Admission now requires that exact package-bound expression; `$pid` is
+  literal and the suffix differentiates policy assignments/initiative references.
+- Read-only commercial provider metadata confirms Policy aliases for
+  `guestConfiguration.name`, `.version`, and `.contentHash`. The helper now
+  strengthens the generated existence condition to require all three plus
+  `complianceStatus=Compliant` in `allOf`. It independently revalidates package
+  metadata, URI, identity and ZIP SHA-256. Sovereign alias availability and
+  live Policy evaluation are not established by this check.
+- Added negative cases for missing, wildcard and unrelated assignment names,
+  including another package's Policy-derived name; status-only conditions;
+  mismatched status/name/version/hash; removed or duplicated predicates; and
+  `anyOf`. The actual pinned offline generator test checks the final name,
+  four-condition conjunction and ZIP hash.
+- Focused validation with Pester 5.3.1:
+  `Invoke-Pester -Path .\Tests\Unit\Tools\AzureMachineConfiguration\AuditPolicy.Tests.ps1 -Output Normal -PassThru`
+  passed all 21 tests with zero skipped; `git diff --check` passed.
+- This correction is scoped to the existing PR. No merge, approval, VM
+  operation, assignment change, hosting deployment or cleanup was performed.

@@ -113,9 +113,14 @@ BeforeAll {
                         effect  = $Effect
                         details = @{
                             type               = 'Microsoft.GuestConfiguration/guestConfigurationAssignments'
+                            name               = '[concat(''SampleAudit$pid'', uniqueString(policy().assignmentId, policy().definitionReferenceId))]'
                             existenceCondition = @{
-                                field  = 'Microsoft.GuestConfiguration/guestConfigurationAssignments/complianceStatus'
-                                equals = 'Compliant'
+                                allOf = @(
+                                    @{ field = 'Microsoft.GuestConfiguration/guestConfigurationAssignments/complianceStatus'; equals = 'Compliant' }
+                                    @{ field = 'Microsoft.GuestConfiguration/guestConfigurationAssignments/guestConfiguration.name'; equals = 'SampleAudit' }
+                                    @{ field = 'Microsoft.GuestConfiguration/guestConfigurationAssignments/guestConfiguration.version'; equals = '1.0.0' }
+                                    @{ field = 'Microsoft.GuestConfiguration/guestConfigurationAssignments/guestConfiguration.contentHash'; equals = $ContentHash }
+                                )
                             }
                         }
                     }
@@ -169,6 +174,87 @@ Describe 'Test-PowerStigAuditPolicyDefinition' {
                 -ContentUri $script:contentUri `
                 -ExpectedPolicyId $script:policyId
         } | Should -Throw '*Policy effect must be auditIfNotExists*'
+    }
+
+    It 'rejects a broad or unrelated assignment lookup even when it requires Compliant' -TestCases @(
+        @{ Name = $null }
+        @{ Name = 'AnUnrelatedCompliantAssignment' }
+        @{ Name = '[concat(''OtherPackage$pid'', uniqueString(policy().assignmentId, policy().definitionReferenceId))]' }
+        @{ Name = '*' }
+        @{ Name = @('[concat(''SampleAudit$pid'', uniqueString(policy().assignmentId, policy().definitionReferenceId))]') }
+    ) {
+        param ($Name)
+        $policy = Get-Content -LiteralPath $script:policyPath -Raw | ConvertFrom-Json -AsHashtable
+        if ($null -eq $Name)
+        {
+            $policy.properties.policyRule.then.details.Remove('name')
+        }
+        else
+        {
+            $policy.properties.policyRule.then.details.name = $Name
+        }
+        $policy | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $script:policyPath
+        {
+            Test-PowerStigAuditPolicyDefinition -PolicyPath $script:policyPath `
+                -PackagePath $script:packagePath -ContentUri $script:contentUri -ExpectedPolicyId $script:policyId
+        } | Should -Throw '*exact Policy-derived*'
+    }
+
+    It 'rejects status-only existence conditions despite correct package metadata and assignment name' {
+        $policy = Get-Content -LiteralPath $script:policyPath -Raw | ConvertFrom-Json -AsHashtable
+        $policy.properties.policyRule.then.details.existenceCondition = @{
+            field = 'Microsoft.GuestConfiguration/guestConfigurationAssignments/complianceStatus'
+            equals = 'Compliant'
+        }
+        $policy | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $script:policyPath
+        {
+            Test-PowerStigAuditPolicyDefinition -PolicyPath $script:policyPath `
+                -PackagePath $script:packagePath -ContentUri $script:contentUri -ExpectedPolicyId $script:policyId
+        } | Should -Throw '*exact configuration name, version and content hash in allOf*'
+    }
+
+    It 'rejects a matching assignment with the wrong <Field> or status' -TestCases @(
+        @{ Field = 'complianceStatus'; Value = 'NonCompliant' }
+        @{ Field = 'guestConfiguration.name'; Value = 'OtherPackage' }
+        @{ Field = 'guestConfiguration.version'; Value = '9.9.9' }
+        @{ Field = 'guestConfiguration.contentHash'; Value = ('0' * 64) }
+    ) {
+        param ($Field, $Value)
+        $policy = Get-Content -LiteralPath $script:policyPath -Raw | ConvertFrom-Json -AsHashtable
+        $condition = $policy.properties.policyRule.then.details.existenceCondition.allOf |
+            Where-Object { $_.field -eq "Microsoft.GuestConfiguration/guestConfigurationAssignments/$Field" }
+        $condition.equals = $Value
+        $policy | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $script:policyPath
+        {
+            Test-PowerStigAuditPolicyDefinition -PolicyPath $script:policyPath `
+                -PackagePath $script:packagePath -ContentUri $script:contentUri -ExpectedPolicyId $script:policyId
+        } | Should -Throw '*must bind assignment field*'
+    }
+
+    It 'rejects removed, duplicated or disjunctive package conditions' -TestCases @(
+        @{ Mutation = 'Remove' }
+        @{ Mutation = 'Duplicate' }
+        @{ Mutation = 'AnyOf' }
+        @{ Mutation = 'ArrayValue' }
+    ) {
+        param ($Mutation)
+        $policy = Get-Content -LiteralPath $script:policyPath -Raw | ConvertFrom-Json -AsHashtable
+        $condition = $policy.properties.policyRule.then.details.existenceCondition
+        switch ($Mutation)
+        {
+            'Remove' { $condition.allOf = @($condition.allOf[0..2]) }
+            'Duplicate' { $condition.allOf[3] = $condition.allOf[0] }
+            'ArrayValue' { $condition.allOf[3].equals = @($condition.allOf[3].equals) }
+            'AnyOf' {
+                $condition.anyOf = $condition.allOf
+                $condition.Remove('allOf')
+            }
+        }
+        $policy | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $script:policyPath
+        {
+            Test-PowerStigAuditPolicyDefinition -PolicyPath $script:policyPath `
+                -PackagePath $script:packagePath -ContentUri $script:contentUri -ExpectedPolicyId $script:policyId
+        } | Should -Throw '*Policy must*'
     }
 
     It 'rejects a definition with a package hash that differs from the ZIP' {
@@ -263,5 +349,12 @@ Describe 'New-PowerStigAuditPolicyDefinition' {
         $result.AssignmentType | Should -Be 'Audit'
         $result.PolicyId | Should -Be $script:policyId
         Test-Path -LiteralPath $result.PolicyPath -PathType Leaf | Should -BeTrue
+        $policy = Get-Content -LiteralPath $result.PolicyPath -Raw | ConvertFrom-Json -AsHashtable
+        $details = $policy.properties.policyRule.then.details
+        $details.name | Should -BeExactly '[concat(''SampleAudit$pid'', uniqueString(policy().assignmentId, policy().definitionReferenceId))]'
+        $details.existenceCondition.allOf.Count | Should -Be 4
+        $hashCondition = $details.existenceCondition.allOf |
+            Where-Object { $_.field -eq 'Microsoft.GuestConfiguration/guestConfigurationAssignments/guestConfiguration.contentHash' }
+        $hashCondition.equals | Should -Be (Get-FileHash -LiteralPath $script:packagePath -Algorithm SHA256).Hash
     }
 }
