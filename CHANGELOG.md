@@ -1,6 +1,7 @@
 # Versions
 
 ## [Unreleased]
+- Added a Windows-first helper to build and validate Audit-only Azure Machine Configuration packages from compiled PowerSTIG MOFs.
 
 ## [4.30.0] - 2026-06-19
 
