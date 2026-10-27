@@ -1,0 +1,229 @@
+# PowerSTIG fork: Azure Machine Configuration audit plan
+
+**Status:** Plan only — no implementation work is authorized by this document.
+The user asked to create a branch and write this plan, but explicitly asked not
+to carry it out yet.
+
+## Goal
+
+Use the PowerSTIG fork as the upstream-aligned source for DISA STIG data and
+Windows DSC checks, and determine whether it can support audit-only Azure
+Machine Configuration at scale. Reuse existing PowerSTIG capability wherever
+the exact rule, release, OS role, and runtime are suitable. Add or port only
+demonstrated gaps. Keep TLS compliance distinct from broad STIG compliance:
+the existing TLS work measures application-specific TLS configuration and
+should not be replaced by a general OS baseline.
+
+The resulting assessment must preserve separate claims for official
+requirements, implemented checks, host evidence, administrator tailoring, and
+Azure Policy delivery. Missing evidence, unsupported content, collection
+errors, manual procedures, and stale reports must never be shown as passing.
+
+## Evidence already available
+
+- The fork is based on `microsoft/PowerStig`; version 4.30.0 is pinned at
+  commit `8c1425e9ab21a2b8aab54783e2945f16c3bb4811`.
+- A static, source-bound comparison exists in the prior AzureTLSCompliance
+  workspace. It is not a runtime assessment. For Server 2022 MS it found 197
+  DSC candidate IDs among 277 current V2R11 requirements; PowerSTIG contains
+  V2R8. For Windows 11, it found 216 among 257 V2R11 requirements; PowerSTIG
+  contains V2R7. Role-separated Windows Server rules require MS/DC-aware
+  accounting.
+- The same comparison found 100 DSC candidate IDs and 343 manual/document IDs
+  among 445 RHEL 9 V2R10 requirements, while PowerSTIG contains RHEL 9 V2R8.
+  The upstream RHEL and Ubuntu composites import `nx` 1.0; Azure Machine
+  Configuration does not use the legacy `nx*` Linux DSC providers. The pinned
+  PowerSTIG release has Ubuntu 18.04 data, but no Ubuntu 20.04, 22.04, or
+  24.04 data, and no RHEL 8 or 10 data.
+- An isolated PowerShell 5.1 compile for Windows Server 2022 MS V2R8 succeeded.
+  A GuestConfiguration 4.10.0 Audit package was built without upstream
+  modifications. Its 800 ZIP members, hashes, Audit metadata, embedded MOF,
+  and 8,130,042-byte uncompressed size were independently verified.
+- The successful package proves compile and package-format compatibility only.
+  It does **not** prove Guest Configuration worker execution, correct
+  compliance Reasons, current V2R11 coverage, host assessment, Azure Policy
+  delivery, or fleet qualification.
+
+## Principles and constraints
+
+1. **Audit only.** No DSC `Set`/remediation path in the assessment package.
+   Review the generated MOF, package metadata, and resource implementations
+   before accepting an artifact as audit-only.
+2. **Upstream first.** Do not create a parallel full STIG engine. Keep a clean,
+   reviewable fork and prefer upstream data, resources, and maintenance. Keep
+   local changes narrow, versioned, tested, and documented for upstream
+   contribution where appropriate.
+3. **Exact release and role.** Pin the official benchmark artifact, release,
+   role, source URL, and hashes. Do not silently substitute an older upstream
+   STIG release for a newer official benchmark.
+4. **No conversion optimism.** A processed/conversion `pass` marker is not a
+   passing host assessment. Preserve manual/document requirements as manual
+   evidence; do not make a whole-profile pass claim from a subset.
+5. **Machine Configuration compatibility is a separate gate.** Legacy DSC
+   resource presence does not establish PowerShell 7 or Linux runtime support.
+   Linux `nx*` resources cannot be assumed to run under Machine Configuration.
+6. **Meaningful reporting.** Verify native per-rule observed/expected output,
+   including Machine Configuration `Reasons` (`Code` and `Phrase`) where
+   applicable. Errors and unknown applicability remain explicit.
+7. **Tailoring is transparent.** Distinguish official values, organization
+   settings, exceptions, and skipped rules. Any excluded control remains
+   visible and cannot become an unqualified compliance assertion.
+8. **Separate environment qualification.** Commercial Azure results do not
+   qualify Azure Government, USSEC, or USNAT. Use only confirmed endpoints,
+   service availability, identities, network paths, and approved package
+   hosting for each environment.
+9. **Preserve evidence and resources.** Keep prior packages, historical
+   acceptance, failures, and lab resources intact. Any future guest test needs
+   explicit scope, bounded execution, raw evidence, and verified deallocation.
+10. **Protect tenant information.** Do not copy Azure tenant identifiers,
+    screenshots, raw guest evidence, credentials, or internal lab artifacts
+    into this public-source fork.
+
+## Proposed phases and decision gates
+
+### Phase 1 — Establish the fork baseline and contribution model
+
+- Confirm the fork default branch, upstream remote, license, contributor
+  instructions, pull-request template, and current upstream release.
+- Record a reproducible upstream synchronization procedure. Never merge
+  unrelated AzureTLSCompliance lab files or evidence into the fork.
+- Decide whether an additional `upstream` remote is needed and document safe
+  synchronization without changing user Git configuration.
+
+**Exit:** clean branch history, known upstream baseline, and an agreed
+contribution/update strategy.
+
+### Phase 2 — Build a complete versioned coverage matrix
+
+- For each target OS and role, compare the pinned DISA benchmark to the exact
+  PowerSTIG release data and resources by stable vulnerability and STIG IDs.
+- Start with Windows Server 2022 MS, because the isolated V2R8 Audit package
+  already compiles; explicitly reconcile it to the current V2R11 benchmark.
+- Include Windows Server 2016, 2019, and 2025, Windows 11, RHEL 8/9/10, and
+  Ubuntu 18.04/20.04/22.04/24.04 only where those releases remain in scope.
+- Separate automated-resource candidates, manual/document controls, absent
+  rules, role/applicability differences, duplicate/split rules, and version
+  changes. Retain the source text and hashes for every comparison.
+- Determine whether newer exact benchmark imports can be made through the
+  repository's supported conversion process or need a narrowly scoped upstream
+  contribution.
+
+**Exit:** reviewed per-profile inventory with every official rule represented
+and no version/role mismatches hidden as coverage.
+
+### Phase 3 — Validate the Windows Audit runtime and reporting
+
+- Reproduce the pinned Windows Server 2022 MS V2R8 compilation and package
+  from a clean, documented build environment.
+- Verify that the package dependencies are complete, version-pinned, and
+  isolated; verify the Audit mode in the exact package consumed by the worker.
+- Inspect DSC resource `Get`, `Test`, and `Set` behavior. Prove the assigned
+  Audit artifact cannot remediate. Review whether Get returns useful,
+  rule-specific observed/expected information and valid native Reasons.
+- Test safe fixtures and errors without running against a workstation or
+  changing a production/lab guest. Keep package-format evidence distinct from
+  worker and service evidence.
+- Reconcile the upstream V2R8 content against the intended current release;
+  document any controls that cannot be claimed current.
+
+**Gate:** do not call the Windows profile Azure-qualified until the actual
+Machine Configuration worker executes the artifact in an explicitly approved
+test environment and returns independently verified native evidence.
+
+### Phase 4 — Choose a supported Linux reuse/port strategy
+
+- Do not package the existing `nx*` composites for Machine Configuration as if
+  they were compatible.
+- For RHEL 9 and Ubuntu 18.04, evaluate reusable rule data and check semantics
+  separately from the legacy DSC resources.
+- Compare the cost and maintenance risk of porting suitable checks to
+  PowerShell 7-compatible DSC v3 resources versus retaining an explicit,
+  supported alternative assessment engine for Linux.
+- For RHEL 8/10 and Ubuntu 20.04/22.04/24.04, first establish whether the
+  required PowerSTIG benchmark data can be imported and maintained. Do not
+  infer coverage from a neighboring OS release.
+- Include per-rule positive, negative, missing-evidence, unsupported, and
+  collection-error cases; no remediating implementation.
+
+**Decision gate:** select a Linux architecture only after exact release data,
+runtime support, reporting, and maintenance ownership are demonstrated.
+If Machine Configuration cannot support the chosen resource model, record
+that limitation instead of claiming a cross-platform drop-in solution.
+
+### Phase 5 — Define assessment contracts, parameters, and tailoring
+
+- Specify profile identity, source/version pins, OS/role dispatch, stale-data
+  handling, error/unknown states, and per-rule output.
+- Decide how parameters are passed through Azure assignments, respecting
+  Machine Configuration's string-only configuration parameter limitation.
+- Define how organizational values, exceptions, skipped rules, and manual
+  evidence appear in reports without converting exclusions to passes.
+- Keep `NotApplicable` tied to measured, source-supported applicability—not an
+  inferred image name, VM name, or missing field.
+
+**Exit:** schema and acceptance tests reject missing IDs, duplicate/truncated
+results, mismatched source hashes, unknown status, and unsupported targeting.
+
+### Phase 6 — Build and release pipeline
+
+- Create deterministic, offline-capable package builds from pinned sources and
+  dependencies. Record tool versions, module versions, input hashes, MOF
+  identity, package contents, audit mode, and output hashes.
+- Produce immutable versioned artifacts and a Software Bill of Materials or
+  equivalent dependency inventory.
+- Separate source validation, package-format validation, worker/runtime
+  validation, native report validation, and Azure Policy assignment validation.
+- Keep artifacts and any storage permissions least-privilege. Do not put
+  internal tenant evidence or credentials in the public fork.
+
+**Exit:** repeat builds are explainable and produce verified, immutable
+artifacts with no implicit dependency downloads.
+
+### Phase 7 — Azure Policy and environment deployment design
+
+- Define separate, explicit policy definitions/assignments for each qualified
+  OS release/role; group them with an initiative only after targeting is
+  proven. Unsupported machines must not be silently selected.
+- Validate normal Machine Configuration delivery, assignment identity,
+  assignment content hash, freshness, per-rule Reasons, and post-scan state.
+- Document commercial Azure first. Treat Azure Government, USSEC, and USNAT
+  as separate availability/network/identity qualification exercises; do not
+  guess endpoints or reuse commercial-cloud success as proof.
+- Keep audit assignment and any remediation/redeploy process out of scope until
+  separately authorized.
+
+**Exit:** test evidence proves exact targeting and normal delivery with no
+scope/cloud auto-switch and no silent fallback.
+
+### Phase 8 — Controlled acceptance and operator documentation
+
+- Obtain approval before any VM starts, guest invocation, cloud publication,
+  role assignment, or Policy assignment.
+- Test one explicitly approved machine per supported OS/release/role, preserving
+  raw inputs, complete outputs, invocation receipts, source/package pins,
+  errors, and final power-state evidence.
+- Compare service-level status to native per-rule observations; CLI success
+  alone is not assessment success.
+- Document package admission, tailoring approvals, assignment, monitoring,
+  failure triage, update, rollback, and environment-specific prerequisites.
+- Retain the already completed TLS and Windows Server 2022 legacy acceptance as
+  separate historical scopes; do not silently broaden their claims.
+
+**Final acceptance:** only name the OS/release/role/environment combinations
+that passed every source, runtime, reporting, delivery, targeting, and
+operations gate. Keep all other combinations explicitly unqualified.
+
+## Explicitly out of scope for this planning branch
+
+- Implementing or changing DSC resources, rule data, collectors, packages, or
+  Policy definitions.
+- Running a guest assessment, `Get`/`Test`/`Set`, remediation, or any Azure
+  mutation.
+- Claiming current Windows V2R11 or Linux Machine Configuration compatibility
+  from the V2R8 package-format trial.
+- Uploading internal AzureTLSCompliance evidence or tenant data to this fork.
+- Deleting or rewriting historical lab resources, artifacts, acceptance, or
+  failures.
+
+**Stop point:** this file and the working branch are the requested deliverable.
+Wait for the user's direction before starting Phase 1 or any later phase.
