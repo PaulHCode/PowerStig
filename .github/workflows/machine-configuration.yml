@@ -29,19 +29,24 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigModules'
+          $null = New-Item -Path $toolRoot -ItemType Directory -Force
+          $env:PSModulePath = "$toolRoot$([System.IO.Path]::PathSeparator)$env:PSModulePath"
           foreach ($dependency in @(
               @{ Name = 'Pester'; Version = '5.3.1' },
               @{ Name = 'GuestConfiguration'; Version = '4.10.0' }
           )) {
               if (-not (Get-Module -ListAvailable -Name $dependency.Name |
                   Where-Object Version -EQ ([version]$dependency.Version))) {
-                  Install-Module -Name $dependency.Name -RequiredVersion $dependency.Version -Scope CurrentUser -Force -ErrorAction Stop
+                  Save-Module -Name $dependency.Name -RequiredVersion $dependency.Version -Path $toolRoot -Repository PSGallery -Force -ErrorAction Stop
               }
           }
       - name: Run offline integration foundations
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigModules'
+          $env:PSModulePath = "$toolRoot$([System.IO.Path]::PathSeparator)$env:PSModulePath"
           Import-Module Pester -RequiredVersion 5.3.1
           $result = Invoke-Pester -Path .\Tests\Unit\Tools\AzureMachineConfiguration -Output Detailed -PassThru
           if ($result.Result -ne 'Passed' -or $result.SkippedCount -gt 0 -or $result.PassedCount -eq 0) {

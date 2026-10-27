@@ -302,6 +302,11 @@ is not qualified.
   passed. The new GitHub workflow repeats the offline suite on Windows and
   Ubuntu and fails for discovery/container failures as well as failed tests.
   These checks do not qualify native guest execution.
+- First GitHub iteration: Ubuntu CI passed. Windows failed before tests because
+  the runner's installed Pester 5.9.0 uses a different signing-certificate chain
+  than pinned Pester 5.3.1. Changed restoration to `Save-Module` in a job-local
+  module directory, avoiding publisher-check bypasses and changes to installed
+  runner modules. This is toolchain isolation, not a guest compliance failure.
 
 ### 2026-10-27 — Offline Audit policy-definition generation
 
