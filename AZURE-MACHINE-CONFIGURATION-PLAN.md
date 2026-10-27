@@ -248,6 +248,61 @@ is not qualified.
 
 ## Journal
 
+### 2026-10-27 - Cross-platform implementation authorization and dispatch decision
+
+- The user authorized implementing this plan, GitHub iterations, documentation,
+  and lab policy testing. Earlier "plan only" restrictions describe the original
+  planning request, not the current implementation authorization.
+- The administrator entry point will be one initiative, with separate Windows
+  and Linux Audit packages. Policy routes by OS family; measured guest identity
+  selects an exact versioned profile. Marketplace image labels are not evidence
+  of the running OS. Unknown/custom-image releases must remain explicit.
+- Windows Server scope is member-server profiles only, per the user's follow-up.
+  Domain controllers must be rejected by guest detection, not assumed absent.
+  Standalone servers may use the MS role only where the benchmark permits it.
+- Lab Policy may target the existing shared lab VM resource group. New supporting
+  resources belong in one separate PowerSTIG lab resource group. Coordinate guest
+  access and power operations with the existing lab owner; preserve TLS artifacts.
+  Tenant IDs, private evidence, and cloud credentials stay outside this repository.
+- Reused the existing package and policy commits through `e5d6e68e`, rather than
+  rewriting the prior integration. The 14 inherited tests passed on PowerShell 7
+  with Pester 5.3.1 and GuestConfiguration 4.10.0.
+- A source-bound inventory of the archived RHEL 9 V2R8 benchmark contains 446
+  requirements. An initial exact-ID lookup appeared to show 18 missing rules;
+  inspecting compiled resource names exposed PowerSTIG's `.a`/`.b` split IDs.
+  Corrected parent/component accounting yields 346 manual, 96 legacy Linux,
+  three mixed-component requirements, and one duplicate reference. No source
+  requirements are absent in this exact archived comparison. None of these
+  static states establishes host compliance or current-release coverage.
+- Added exact measured-identity resolution, source-bound coverage accounting,
+  compiled resource-to-vulnerability mapping, native report interpretation, and
+  an offline two-family initiative composer. These are foundation helpers, not
+  packaged guest dispatchers. The existing per-profile package must not be
+  assigned fleet-wide: its generated policy targets the whole OS family.
+- Native report admission must use the actual Policy-created assignment ID,
+  not assume assignment name equals package name. GuestConfiguration 4.10.0
+  generates an assignment name with a Policy-derived suffix. The report reader
+  separately checks assignment ID, VM ID, configuration identity and content hash.
+- Reproduced the frozen Server 2022 MS package/MOF hash match offline. Its 207
+  DSC instances map to 198 source vulnerability IDs, with one explicitly
+  unmapped registry-refresh helper. Added split-component and missing-evidence
+  report tests. Package validation now exposes the embedded MOF SHA-256 so the
+  resource map cannot silently use an unrelated compile output.
+- Confirmed archived matching source inventories for Windows 11 V2R7 (262),
+  Server 2022 MS V2R8 (238) and Ubuntu 18.04 V2R15 (176). These denominators
+  differ from later benchmark releases; do not merge their coverage claims.
+- Lab inspection was management-plane read-only. The proposed Windows 11 test
+  guest was deallocated and had no extensions. The shared lab coordinator
+  reserved a future conditional exclusive slot; no VM was started, extension
+  installed, policy assigned, package uploaded or resource created in this
+  increment. End-to-end dispatcher and cloud acceptance remain outstanding.
+- Local validation: `Import-Module Pester -RequiredVersion 5.3.1;
+  Invoke-Pester -Path .\Tests\Unit\Tools\AzureMachineConfiguration -Output Normal
+  -PassThru` passed all 63 tests with zero skipped tests; `git diff --check`
+  passed. The new GitHub workflow repeats the offline suite on Windows and
+  Ubuntu and fails for discovery/container failures as well as failed tests.
+  These checks do not qualify native guest execution.
+
 ### 2026-10-27 — Offline Audit policy-definition generation
 
 - Added `New-PowerStigAuditPolicyDefinition` and

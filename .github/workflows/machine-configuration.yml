@@ -1,0 +1,49 @@
+name: Machine Configuration foundations
+
+on:
+  push:
+    paths:
+      - 'Tools/AzureMachineConfiguration/**'
+      - 'Tests/Unit/Tools/AzureMachineConfiguration/**'
+      - '.github/workflows/machine-configuration.yml'
+  pull_request:
+    paths:
+      - 'Tools/AzureMachineConfiguration/**'
+      - 'Tests/Unit/Tools/AzureMachineConfiguration/**'
+      - '.github/workflows/machine-configuration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore missing pinned authoring and test tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($dependency in @(
+              @{ Name = 'Pester'; Version = '5.3.1' },
+              @{ Name = 'GuestConfiguration'; Version = '4.10.0' }
+          )) {
+              if (-not (Get-Module -ListAvailable -Name $dependency.Name |
+                  Where-Object Version -EQ ([version]$dependency.Version))) {
+                  Install-Module -Name $dependency.Name -RequiredVersion $dependency.Version -Scope CurrentUser -Force -ErrorAction Stop
+              }
+          }
+      - name: Run offline integration foundations
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module Pester -RequiredVersion 5.3.1
+          $result = Invoke-Pester -Path .\Tests\Unit\Tools\AzureMachineConfiguration -Output Detailed -PassThru
+          if ($result.Result -ne 'Passed' -or $result.SkippedCount -gt 0 -or $result.PassedCount -eq 0) {
+              throw 'Machine Configuration offline validation failed or did not run completely.'
+          }

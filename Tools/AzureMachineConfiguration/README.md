@@ -7,6 +7,180 @@ also contains an offline generator and validator for a matching
 packages or policy definitions, create policy assignments, or run a
 configuration against a machine.
 
+## One assignment, measured OS selection
+
+The delivery design is **one initiative**, containing a Windows Audit policy and
+a Linux Audit policy. Each family package must measure its guest OS and select
+an exact, pinned profile. Azure Policy image fields only route the family; they
+cannot establish the running release or the Windows server role. This also
+supports custom images without requiring an administrator-maintained OS tag.
+
+Windows Server uses **MS profiles only**. Guest detection explicitly rejects
+domain controllers, including a mismatch between OS ProductType and computer
+DomainRole. Windows 11 is distinguished from Server 2025 even though they can
+share a kernel build. Ubuntu releases are exact matches; RHEL minor versions
+map to their major-release benchmark. Derivatives such as Rocky Linux do not
+silently inherit a RHEL profile.
+
+**Implementation status:** the identity, coverage, resource-map, report and
+initiative helpers below are available for offline development. They are not yet
+wired into distributable guest dispatcher packages. No OS/cloud combination is
+production-qualified by these helpers. In particular, do not assign an existing
+Server 2022 composite package to every Windows VM: the generic policy generator
+targets an OS family, not that package's exact release. A fleet assignment needs
+the guest dispatcher and profile-admission gates first.
+
+```powershell
+. .\Tools\AzureMachineConfiguration\Profile.ps1
+$identity = Resolve-PowerStigMachineConfigurationProfile `
+    -HostFacts (Get-PowerStigMachineConfigurationHost)
+$identity
+```
+
+`Recognized` is an identity result, not a promise that content or a qualified
+runtime exists. Unknown releases and DCs return `Unsupported` with a reason.
+Discovery reads CIM or `/etc/os-release`; it does not execute content from
+`os-release`, infer a release from image names, or change guest settings.
+
+## Coverage before compliance
+
+Use the official XCCDF as the denominator, not only processed rules. Pin and
+review the intended benchmark before building. An archived benchmark documents
+that historical release, not today's latest DISA requirements.
+
+```powershell
+. .\Tools\AzureMachineConfiguration\Coverage.ps1
+$coverage = Get-PowerStigMachineConfigurationCoverage `
+    -BenchmarkPath '.\source\StigData\Archive\Linux.RHEL\U_RHEL_9_STIG_V2R8_Manual-xccdf.xml' `
+    -ProcessedPath '.\source\StigData\Processed\RHEL-9-2.8.xml'
+$coverage.Rules | Group-Object CoverageState | Select-Object Name, Count
+
+$mapping = Get-PowerStigMachineConfigurationResourceMap `
+    -ConfigurationMofPath '<approved compiled configuration>.mof'
+```
+
+Coverage includes benchmark/processed SHA-256, exact version/identity comparison,
+every source vulnerability, and all processed split-rule components. Manual,
+legacy Linux, organization-value, duplicate-reference, conversion-failure,
+missing and mixed states remain visible. A processed `pass` is never a host
+pass. The MOF mapper preserves complete DSC resource IDs and groups `.a`/`.b`
+components under their source vulnerability. Unmapped helper resources remain
+visible and require explicit review.
+
+## Native reports with explanations
+
+`ConvertFrom-PowerStigMachineConfigurationReport` accepts the **full native
+assignment report** and the corresponding assignment, loaded as hashtables.
+Supply expected VM/assignment IDs, package name/version/hash, pinned benchmark
+hash, coverage and resource mapping:
+
+```powershell
+. .\Tools\AzureMachineConfiguration\AuditReport.ps1
+$parameters = @{
+    Report                       = Get-Content '<private report>.json' -Raw | ConvertFrom-Json -AsHashtable
+    Assignment                   = Get-Content '<private assignment>.json' -Raw | ConvertFrom-Json -AsHashtable
+    ExpectedVmId                 = '<exact VM ARM ID>'
+    ExpectedAssignmentId         = '<exact Policy-created guest assignment ARM ID>'
+    ExpectedConfigurationName    = '<package configuration name>'
+    ExpectedConfigurationVersion = '1.0.0'
+    ExpectedPackageHash          = '<approved ZIP SHA-256>'
+    ExpectedBenchmarkHash        = $coverage.BenchmarkSha256
+    Coverage                     = $coverage
+    ResourceMap                  = $mapping
+    ExpectedConfigurationMofHash = $package.ConfigurationMofSha256
+    MaximumAgeMinutes            = 60
+}
+$assessment = ConvertFrom-PowerStigMachineConfigurationReport @parameters
+$assessment.Requirements | Select-Object VulnerabilityId, Status, Reasons
+```
+
+Here `$package` is the result of `Test-PowerStigAuditPackage` on the approved
+ZIP. The mapper's MOF hash must match the embedded MOF hash from that package,
+not an unrelated compile output.
+
+Reports are the `2024-04-05` Guest Configuration report REST shape, not just
+Policy compliance summaries or `latestAssignmentReport` summaries. Use the
+assignment's report link/ID to read its full `reports/<reportId>` resource.
+Policy-created assignment names can differ from configuration names.
+
+The reader preserves native `Code`/`Phrase` reasons and observed properties.
+It does not invent an expected value when the resource did not report it.
+Wrong VM/package/source identities, duplicate IDs and invalid timestamps fail
+explicitly. Missing resources/reasons, pending/unknown states, stale results,
+unmapped resources and unassessed source requirements cannot become a whole
+benchmark pass. `AssessmentStatus` describes the admitted report, not release
+or cloud production qualification. Keep raw guest reports private: they may
+contain sensitive machine configuration.
+
+## Compose the administrator entry point
+
+After both family policies and their packages pass admission, publish their
+custom definitions and compose an initiative using the actual definition IDs:
+
+```powershell
+. .\Tools\AzureMachineConfiguration\AuditInitiative.ps1
+$initiative = New-PowerStigAuditInitiative `
+    -Name 'PowerStigAudit' `
+    -WindowsPolicyDefinitionId '<published Windows custom policy ARM ID>' `
+    -LinuxPolicyDefinitionId '<published Linux custom policy ARM ID>'
+$initiative | ConvertTo-Json -Depth 30 | Set-Content '.\PowerStigAudit.json'
+```
+
+The composer produces local JSON only. It accepts subscription or management
+group custom-definition IDs, with stable `PowerStigWindows`/`PowerStigLinux`
+references. It does not publish definitions, provision prerequisites, grant
+roles, or attest to the referenced policies' safety. Both references must point
+to reviewed **Audit-only family dispatchers**, not arbitrary per-profile MOFs.
+Assign the resulting initiative once at the intended management group,
+subscription or resource-group scope. Use separate prerequisite onboarding for
+VM identity, the Machine Configuration extension and package read access.
+
+## Cloud and operational qualification
+
+| Environment | Required evidence | Current qualification |
+| --- | --- | --- |
+| Azure commercial | Exact guest worker, native Reasons, normal Policy delivery, targeting and freshness | Not qualified |
+| Azure Government | Same gates in the target government cloud, approved local hosting/identity/network | Not qualified |
+| USSEC | Environment-owner-confirmed service/API availability, approved endpoints and local artifacts; all gates in that environment | Not qualified |
+| USNAT | Environment-owner-confirmed service/API availability, approved endpoints and local artifacts; all gates in that environment | Not qualified |
+
+No sovereign endpoint is inferred or hard-coded. An initiative's ARM IDs are
+cloud-neutral, but service availability, extension images, resource-provider
+registration, policy aliases, storage access and API versions are not thereby
+qualified. Disconnected environments need approved mirrored dependencies and
+artifact promotion without public Gallery/GitHub access at evaluation time.
+If Machine Configuration is unavailable in a target environment, a custom
+Policy definition cannot make that service available.
+
+Before a lab run, record the exact artifact hashes, target, action, output
+location, timeout and powered-on budget. Coordinate exclusive guest access on
+shared VMs. Keep new supporting resources in one dedicated resource group;
+Policy definitions are subscription/management-group resources, not RG-contained
+resources, while their test assignment may target the shared VM RG. Do not
+change existing TLS assignments or use their evidence as STIG qualification.
+Preserve before/after ARM state, full native results and errors privately.
+Restore/deallocate only the exact VMs started for the agreed test; do not delete
+shared lab resources as cleanup.
+
+Release gates remain: current source coverage and tailoring review; pinned
+offline dependencies; Audit-only artifact inspection; guest runtime execution;
+per-rule native explanations; Policy delivery and OS/DC targeting; freshness;
+and separate cloud qualification. Roll back by reassigning an approved prior
+immutable release, with approval for any assignment deletion. Do not overwrite
+old package blobs. Manual controls/exceptions remain visible in reporting.
+
+## Focused validation
+
+```powershell
+Import-Module Pester -RequiredVersion 5.3.1
+Invoke-Pester -Path .\Tests\Unit\Tools\AzureMachineConfiguration -Output Detailed
+```
+
+These are offline behavior tests. They do not execute a configuration against
+the workstation or establish guest-worker, Azure Policy or sovereign acceptance.
+The [implementation journal](../../AZURE-MACHINE-CONFIGURATION-PLAN.md#journal)
+tracks decisions, corrections, completed increments and remaining gates.
+
 ## Build an Audit package
 
 Compile the selected Windows PowerSTIG configuration with the pinned PowerSTIG

@@ -85,6 +85,7 @@ Describe 'Test-PowerStigAuditPackage' {
         $result.ExpandedSizeBytes | Should -BeGreaterThan 0
         $result.EntryCount | Should -Be 2
         $result.ConfigurationMofName | Should -Be 'SampleAudit.mof'
+        $result.ConfigurationMofSha256 | Should -Match '^[A-F0-9]{64}$'
     }
 
     It 'rejects packages that include AuditAndSet metadata' {

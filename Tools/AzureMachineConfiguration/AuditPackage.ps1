@@ -115,6 +115,20 @@ function Test-PowerStigAuditPackage
             throw "Package version '$($metadata.Version)' does not match expected version '$ExpectedVersion'."
         }
 
+        $configurationStream = $configurationEntry.Open()
+        $hashAlgorithm = [System.Security.Cryptography.SHA256]::Create()
+        try
+        {
+            $configurationHash = [System.BitConverter]::ToString(
+                $hashAlgorithm.ComputeHash($configurationStream)
+            ).Replace('-', '')
+        }
+        finally
+        {
+            $hashAlgorithm.Dispose()
+            $configurationStream.Dispose()
+        }
+
         [pscustomobject]@{
             PackagePath          = $packageFile.FullName
             PackageName          = $packageName
@@ -125,6 +139,7 @@ function Test-PowerStigAuditPackage
             ExpandedSizeBytes    = $expandedBytes
             EntryCount           = $archive.Entries.Count
             ConfigurationMofName = $configurationName
+            ConfigurationMofSha256 = $configurationHash
         }
     }
     finally
