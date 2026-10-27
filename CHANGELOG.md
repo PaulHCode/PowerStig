@@ -1,7 +1,7 @@
 # Versions
 
 ## [Unreleased]
-- Added a Windows-first helper to build and validate Audit-only Azure Machine Configuration packages from compiled PowerSTIG MOFs.
+- Added Windows-first helpers to build and validate Audit-only Azure Machine Configuration packages from compiled PowerSTIG MOFs and generate/validate matching local `auditIfNotExists` policy definitions.
 
 ## [4.30.0] - 2026-06-19
 

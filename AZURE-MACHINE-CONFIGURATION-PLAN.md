@@ -1,8 +1,9 @@
 # PowerSTIG fork: Azure Machine Configuration audit plan
 
 **Status:** Implementation has started with a local-only Windows Audit-package
-builder and validator. Package publication, Azure Policy deployment, guest
-execution, and profile qualification remain separate, uncompleted gates.
+builder/validator and an offline `auditIfNotExists` policy-definition
+generator/validator. Package publication, policy assignment, guest execution,
+and profile qualification remain separate, uncompleted gates.
 
 ## Goal
 
@@ -184,6 +185,13 @@ artifacts with no implicit dependency downloads.
 - Define separate, explicit policy definitions/assignments for each qualified
   OS release/role; group them with an initiative only after targeting is
   proven. Unsupported machines must not be silently selected.
+- The current local generator creates an `auditIfNotExists` definition that
+  checks the compliance state of a Guest Configuration assignment. When the
+  definition is published and assigned, Machine Configuration uses its
+  metadata to create the guest assignment. The local generator does not publish
+  or assign the policy. Keep the normal Policy delivery path; do not fabricate
+  guest assignments for qualification. Deleting a Policy assignment also
+  deletes its Policy-created guest assignment, so retain both after tests.
 - Validate normal Machine Configuration delivery, assignment identity,
   assignment content hash, freshness, per-rule Reasons, and post-scan state.
 - Document commercial Azure first. Treat Azure Government, USSEC, and USNAT
@@ -225,10 +233,43 @@ operations gate. Keep all other combinations explicitly unqualified.
 - Deleting or rewriting historical lab resources, artifacts, acceptance, or
   failures.
 
-**Current implementation increment:** `Tools\AzureMachineConfiguration\` now
+**Current implementation increment:** `Tools\AzureMachineConfiguration\`
 contains a Windows-first helper that always requests `Type Audit` and validates
 the generated package metadata, embedded MOF, version, SHA-256, and expanded
-size. Pester coverage exercises package validation and the builder's guard
-rails. This is package-authoring tooling only; it has not published a package,
-created an Azure Policy definition or assignment, invoked a guest, or qualified
-the worker's per-rule Reasons behavior.
+size. It also generates a local `auditIfNotExists` policy definition bound to
+that package's exact hash and HTTPS content URI, then validates the definition.
+The pinned GuestConfiguration 4.10.0 generator runs from a temporary
+byte-verified copy so its `gcworker\temp` reset cannot remove files from the
+installed module. Focused Pester tests cover package/policy validation,
+overwrite guards, unsafe URI rejection, and offline generation. No package or
+policy has been published, no policy assignment or guest assignment has been
+created, no guest has been invoked, and the worker's per-rule Reasons behavior
+is not qualified.
+
+## Journal
+
+### 2026-10-27 — Offline Audit policy-definition generation
+
+- Added `New-PowerStigAuditPolicyDefinition` and
+  `Test-PowerStigAuditPolicyDefinition`. The generated definition is
+  `auditIfNotExists` and must match the validated Audit ZIP's name, version,
+  SHA-256, HTTPS content URI, system-assigned content identity, and
+  `complianceStatus=Compliant` condition.
+- GuestConfiguration 4.10.0's `New-GuestConfigurationPolicy` resets
+  `<PSScriptRoot>\gcworker\temp`. To avoid touching the installed module's
+  worker state, the helper copies only its policy script and complete templates
+  directory to a unique temporary root and verifies their SHA-256 hashes
+  before invoking the generator. It stages and validates JSON before moving it
+  into the requested output directory, and preserves existing output unless
+  `-Force` is provided.
+- A local generator integration test used a fixture package and
+  `https://example.invalid/` URI with `LocalContentPath`; no network call or
+  Azure operation was made. All seven focused policy tests passed with Pester
+  5.3.1. The frozen Server 2022 MS V2R8 package was separately revalidated:
+  Audit 1.0.0, 800 ZIP entries, 8,130,042 expanded bytes, SHA-256
+  `af3213d5b4416f4bd63eedce6559b09e8fec5152da2b1b13eeb2f5ec39f8f05d`.
+- This policy effect only checks for an existing compliant Guest Configuration
+  assignment at the policy-rule level; Microsoft documents that the Machine
+  Configuration service uses the policy metadata to create the guest
+  assignment after policy assignment. No package/policy publication,
+  assignment, identity change, VM start, or guest execution has occurred.
