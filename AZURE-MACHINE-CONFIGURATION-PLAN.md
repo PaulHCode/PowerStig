@@ -360,3 +360,17 @@ is not qualified.
   passed all 21 tests with zero skipped; `git diff --check` passed.
 - This correction is scoped to the existing PR. No merge, approval, VM
   operation, assignment change, hosting deployment or cleanup was performed.
+- Follow-up clarification: the stock pinned generator already supplies the
+  correct suffixed name; the established gap is validator admission of an
+  omitted/altered name, not a missing name in the stock generated output.
+  Microsoft's [auditIfNotExists semantics](https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-audit-if-not-exists)
+  specify that `name` fetches one specific related resource instead of all
+  resources of that type, and that any matching resource satisfying
+  `existenceCondition` suppresses the audit. Thus a name-less, status-only
+  variant can be satisfied by an unrelated compliant assignment in the
+  applicable lookup scope. This is documented semantic validation, not a
+  claim of a live exploit or service-level test.
+- Commit `ebb8de02` passed both Windows and Ubuntu jobs in the PR and push
+  workflows. `gh pr checks 1 --repo PaulHCode/PowerStig --watch --interval 10`
+  completed successfully; PR run `40600341154` reports success for the exact
+  commit. No merge or approval was performed.

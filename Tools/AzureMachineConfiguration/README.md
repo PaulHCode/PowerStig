@@ -297,6 +297,7 @@ References:
 
 - [Machine Configuration DSC behavior and Audit mode](https://learn.microsoft.com/en-us/azure/governance/machine-configuration/whats-new/psdsc-in-machine-configuration)
 - [Machine Configuration assignment resources and Policy delivery](https://learn.microsoft.com/en-us/azure/governance/machine-configuration/concepts/assignments)
+- [Azure Policy auditIfNotExists related-resource lookup semantics](https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-audit-if-not-exists)
 - [Develop a custom Machine Configuration package](https://learn.microsoft.com/en-us/azure/governance/machine-configuration/how-to/develop-custom-package/overview)
 - [PowerSTIG Windows Server configuration](https://github.com/microsoft/PowerStig/tree/4.30.0-PSGallery/source/DSCResources/WindowsServer)
 - [Azure `nxtools` project](https://github.com/Azure/nxtools)
