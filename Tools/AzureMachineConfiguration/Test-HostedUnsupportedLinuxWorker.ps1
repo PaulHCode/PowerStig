@@ -55,6 +55,17 @@ try
     {
         throw 'The measured profile is bundled; use the supported-profile contract instead.'
     }
+    $stage = 'ModulePreflight'
+    $expanded = Join-Path $OutputPath 'package'
+    Expand-Archive -LiteralPath $package.PackagePath -DestinationPath $expanded
+    $modulePath = Join-Path $expanded 'Modules/PowerStig.MachineConfiguration/PowerStig.MachineConfiguration.psd1'
+    $baseline = Import-Module -Name $modulePath -Force -PassThru
+    $preflight = & $baseline.ExportedCommands['Get-PowerStigBaselineAssessment'] -Family Linux
+    if ($preflight.Status -cne 'Unsupported' -or $preflight.ProfileId -cne $identity.ProfileId -or
+        $preflight.Rules.Count -ne 0)
+    {
+        throw 'Direct module preflight did not preserve the unbundled-profile boundary.'
+    }
     Import-PowerStigGuestConfiguration -Version '4.10.0'
     $modules = @(Get-Module GuestConfiguration | Where-Object Version -EQ ([version]'4.10.0'))
     if ($modules.Count -ne 1) { throw 'Expected one pinned GuestConfiguration 4.10.0 module.' }
@@ -66,12 +77,44 @@ try
     $rawPath = Join-Path $OutputPath 'worker-report.private.json'
     [IO.File]::WriteAllText($rawPath, $reportJson)
     $reportObject = ConvertFrom-Json -InputObject $reportJson -AsHashtable -Depth 40
+    $failurePatterns = [ordered]@{
+        ModuleDiscovery = 'module|Import-Module'
+        ResourceDiscovery = 'resource|PowerStigBaseline'
+        ParserFailure = 'ParserError|parse error|cannot be parsed|Unexpected token'
+        MissingCommand = 'not recognized|CommandNotFound'
+        MissingFile = 'not found|cannot find|does not exist|No such file'
+        AccessDenied = 'permission denied|access.*denied|UnauthorizedAccess'
+        AssemblyLoad = 'assembly|DllNotFound|shared librar|libssl|libcrypto'
+        PowerShellVersion = 'PowerShell 7 or later|version.*PowerShell'
+        NullValue = 'null-valued|null reference|NullReferenceException'
+        MethodFailure = 'MethodInvocation|method.*fail|Exception calling'
+        MissingProperty = 'property.*cannot be found|PropertyNotFound'
+        InvalidArgument = 'InvalidArgument|Cannot bind|parameter.*not.*found'
+        DscInfrastructure = 'PSDesiredStateConfiguration|DSC engine|Invoke-DscResource'
+    }
+    $engineIndicators = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($resource in @($reportObject['resources']))
+    {
+        foreach ($reason in @($resource['reasons']))
+        {
+            if ($reason['code'] -clike 'PowerStigBaseline:PowerStigBaseline:*') { continue }
+            foreach ($indicator in $failurePatterns.Keys)
+            {
+                if ([string]$reason['phrase'] -imatch $failurePatterns[$indicator])
+                {
+                    $null = $engineIndicators.Add($indicator)
+                }
+            }
+        }
+    }
     $summary = [ordered]@{
         EvidenceKind = 'EphemeralLinuxUnsupportedWorkerNotAzurePolicyAdmission'
         PackageSha256 = $package.PackageSha256
         ProfileId = $identity.ProfileId
+        DirectModulePreflightValidated = $true
         Shape = Get-PowerStigWorkerReportShape -Report $reportObject
         NativeReportSha256 = (Get-FileHash -LiteralPath $rawPath).Hash
+        EngineFailureIndicators = @($engineIndicators | Sort-Object)
         UnsupportedContractValidated = $false
         NativeAzureReportAdmitted = $false
     }
