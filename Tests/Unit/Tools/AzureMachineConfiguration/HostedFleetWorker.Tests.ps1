@@ -3,6 +3,7 @@
 
 BeforeAll {
     $workerScript = "$PSScriptRoot\..\..\..\..\Tools\AzureMachineConfiguration\Test-HostedFleetWorker.ps1"
+    $linuxWorkerScript = "$PSScriptRoot\..\..\..\..\Tools\AzureMachineConfiguration\Test-HostedUnsupportedLinuxWorker.ps1"
 }
 
 Describe 'Hosted worker safety boundary' {
@@ -28,6 +29,19 @@ Describe 'Hosted worker safety boundary' {
         $env:RUNNER_ENVIRONMENT = 'self-hosted'
         $output = Join-Path $TestDrive 'self-hosted'
         { & $workerScript -OutputPath $output } | Should -Throw '*ephemeral GitHub-hosted Windows runner*'
+        Test-Path -LiteralPath $output | Should -BeFalse
+    }
+
+    It 'refuses Linux worker execution outside the admitted ephemeral runner: <Environment>' -TestCases @(
+        @{ Actions = 'false'; Environment = 'github-hosted' }
+        @{ Actions = 'true'; Environment = 'self-hosted' }
+    ) {
+        param ($Actions, $Environment)
+        $env:GITHUB_ACTIONS = $Actions
+        $env:RUNNER_ENVIRONMENT = $Environment
+        $output = Join-Path $TestDrive "linux-$Environment"
+        { & $linuxWorkerScript -PackagePath 'absent.zip' -ExpectedPackageSha256 ('A' * 64) -OutputPath $output } |
+            Should -Throw '*ephemeral GitHub-hosted Linux runner*'
         Test-Path -LiteralPath $output | Should -BeFalse
     }
 }

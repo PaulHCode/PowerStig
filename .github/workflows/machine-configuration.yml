@@ -106,3 +106,81 @@ jobs:
             ${{ runner.temp }}\PowerStigWorkerRun\worker-failure.json
           if-no-files-found: warn
           retention-days: 7
+      - name: Build Linux Audit surrogate for the dependent worker job
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigWorkerModules'
+          $env:PSModulePath = "$toolRoot$([IO.Path]::PathSeparator)$env:PSModulePath"
+          $output = Join-Path $env:RUNNER_TEMP 'PowerStigLinuxAuthoring'
+          $package = & .\Tools\AzureMachineConfiguration\Build-FleetPackage.ps1 -Family Linux -OutputPath $output
+          @{ PackageSha256 = $package.PackageSha256 } | ConvertTo-Json |
+              Set-Content -LiteralPath (Join-Path $output 'linux-package.json') -Encoding utf8
+      - name: Transfer the source-only Linux Audit surrogate
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-worker-package
+          path: |
+            ${{ runner.temp }}\PowerStigLinuxAuthoring\PowerStigFleetLinux.zip
+            ${{ runner.temp }}\PowerStigLinuxAuthoring\linux-package.json
+          if-no-files-found: error
+          retention-days: 1
+
+  linux-unsupported-worker:
+    needs: windows-worker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-worker-package
+          path: ${{ runner.temp }}/PowerStigLinuxPackage
+      - name: Restore the pinned Linux worker tool
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigWorkerModules'
+          $null = New-Item -Path $toolRoot -ItemType Directory
+          Save-Module -Name GuestConfiguration -RequiredVersion '4.10.0' -Path $toolRoot -Repository PSGallery -Force -ErrorAction Stop
+      - name: Verify native unsupported-profile behavior on the ephemeral runner
+        shell: sudo -E pwsh -NoLogo -NoProfile -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigWorkerModules'
+          $env:PSModulePath = "$toolRoot$([IO.Path]::PathSeparator)$env:PSModulePath"
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'PowerStigLinuxPackage'
+          $receipt = Get-Content -LiteralPath (Join-Path $packageRoot 'linux-package.json') -Raw | ConvertFrom-Json
+          $output = Join-Path $env:RUNNER_TEMP 'PowerStigLinuxWorkerRun'
+          $script = Join-Path $env:GITHUB_WORKSPACE 'Tools/AzureMachineConfiguration/Test-HostedUnsupportedLinuxWorker.ps1'
+          $start = [Diagnostics.ProcessStartInfo]::new((Get-Command pwsh).Source)
+          $start.UseShellExecute = $false
+          $start.RedirectStandardOutput = $true
+          $start.RedirectStandardError = $true
+          foreach ($argument in @('-NoLogo', '-NoProfile', '-File', $script,
+              '-PackagePath', (Join-Path $packageRoot 'PowerStigFleetLinux.zip'),
+              '-ExpectedPackageSha256', $receipt.PackageSha256, '-OutputPath', $output)) {
+              $start.ArgumentList.Add($argument)
+          }
+          $process = [Diagnostics.Process]::Start($start)
+          $stdout = $process.StandardOutput.ReadToEndAsync()
+          $stderr = $process.StandardError.ReadToEndAsync()
+          if (-not $process.WaitForExit(480000)) {
+              $process.Kill($true)
+              throw 'Hosted Linux worker exceeded its eight-minute bound.'
+          }
+          [IO.File]::WriteAllText((Join-Path $env:RUNNER_TEMP 'linux-worker.private.stdout'), $stdout.GetAwaiter().GetResult())
+          [IO.File]::WriteAllText((Join-Path $env:RUNNER_TEMP 'linux-worker.private.stderr'), $stderr.GetAwaiter().GetResult())
+          if ($process.ExitCode -ne 0) {
+              throw 'Hosted Linux worker validation failed; inspect only the scalar-redacted artifacts.'
+          }
+      - name: Retain scalar-redacted Linux worker evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-unsupported-worker-shape
+          path: |
+            ${{ runner.temp }}/PowerStigLinuxWorkerRun/worker-summary.json
+            ${{ runner.temp }}/PowerStigLinuxWorkerRun/worker-failure.json
+          if-no-files-found: warn
+          retention-days: 7

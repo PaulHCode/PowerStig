@@ -343,6 +343,15 @@ effective-registry compliance; `RegistryPolicyFile` remains unsupported.
 Earlier retained package candidates are preserved but must not be published;
 the corrected source requires a new qualified build.
 
+The dependent `linux-unsupported-worker` job uses an ephemeral Ubuntu 24.04
+runner, not an excluded Ubuntu lab VM. Windows authors a separate Linux Audit
+surrogate; the Linux job checks its hash, Audit metadata and catalog before
+execution. Because this release is recognized but unbundled, the worker must
+return explicit noncompliance and the complete unsupported-profile explanation
+on both native reason surfaces, with no substituted benchmark or requirements.
+The child is bounded to eight minutes, with raw logs kept only on the runner.
+This is a negative delivery/worker test, not Ubuntu STIG qualification.
+
 Package creation dispatches through the exact loaded module version's command
 export. Merely importing the pinned module is insufficient when another module
 version or global command shadows it. Missing/ambiguous pinned modules and

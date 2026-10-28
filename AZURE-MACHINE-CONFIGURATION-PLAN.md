@@ -555,3 +555,19 @@ is not qualified.
   summary SHA256 is
   74A9811DA80896C10CFE6AD058CA27C9F33EC51518C40D5CDA248781A5DCD152.
   NativeAzureReportAdmitted remains false; no Azure writes or guest starts.
+
+### 2026-10-28 - Linux hosted-worker negative contract
+
+- Added a dependent Ubuntu 24.04 ephemeral-worker job using a hash-checked
+  Linux Audit surrogate authored on Windows. The measured release must be
+  recognized but absent from the actual package catalog before execution.
+  No host facts are mocked or operating-system release files changed.
+- Added strict native-report validation for Boolean noncompliance, exact
+  measured identity, unsupported status/explanation, fresh timestamp, empty
+  requirement inventory, absent benchmark provenance and both native reasons.
+  All 180 focused tests pass, including contradictory/missing/stale evidence
+  and workstation/self-hosted rejection. Actual Linux-worker execution remains
+  pending the new CI job; this is not positive Ubuntu/RHEL qualification.
+- The source-only package transfer contains no guest observations. Only
+  scalar-redacted report shape/counts/hashes and safe failure metadata may be
+  uploaded after execution. Azure writes, lab guests and compute remain held.
