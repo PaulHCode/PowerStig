@@ -179,11 +179,27 @@ permission to remove resources later. Refresh absolute shutdown deadlines
 immediately before a bounded run: a stale daily `HHmm` value can otherwise
 schedule shutdown on the following day.
 
+For Azure VMs, Machine Configuration documents a separate service-side private
+path: set the VM tag `EnablePrivateNetworkGC` to `TRUE`. Its host connection uses
+Azure's platform virtual IP `168.63.129.16`; the package URL must still resolve
+and route to the storage private endpoint. See the [Machine Configuration
+network requirements](https://learn.microsoft.com/azure/governance/machine-configuration/overview/03-network-requirements#communicate-over-private-link-in-azure).
+An initiative does not set that tag or establish either route. Treat identity,
+extension, private service-path enablement and package connectivity as explicit
+onboarding prerequisites; do not broaden network access automatically.
+
 Private package delivery does not establish that ARM, Entra, extension delivery
-or the Machine Configuration service control plane uses Private Link. Review
-each service's supported network requirements in the target cloud. If production
-requires every one of those connections to be private, that is an additional
-qualification gate, not a promise made by these storage templates.
+or a utility publisher's Managed Run Command uses Private Link. Managed Run
+Command requires Linux Guest Agent 2.4.0.2 or newer and uses the VM-agent channel;
+its live execution and return path must be demonstrated on the exact image and
+network, not inferred from Machine Configuration's private-path support. The
+Action Run Command API's 262,144-character script limit is not evidence of a
+Managed Run Command input limit. Keep independent per-script, serialized-body,
+aggregate-byte, call-count and deadline bounds. Review each service's supported
+network requirements in the target cloud. An Azure Storage service endpoint
+is not a private endpoint, and an NSG allow rule does not provide an outbound
+route. If every control-plane connection must also be private, that remains an
+additional qualification gate, not a promise made by these storage templates.
 
 | Environment | Required evidence | Current qualification |
 | --- | --- | --- |

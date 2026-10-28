@@ -415,3 +415,15 @@ is not qualified.
   delivery remain separate bounded acceptance gates. Reconcile current guest
   reservations and cumulative power before any start; no overall status alone
   qualifies this candidate for fleet or sovereign-cloud use.
+- Reconciled the original validation authorization as a per-VM ceiling, not
+  an aggregate cohort allowance. An expired exclusive slot is still expired;
+  remaining cumulative time does not authorize an immediate start.
+- Documented the Azure VM `EnablePrivateNetworkGC=TRUE` host-channel path
+  separately from private package storage and the publisher's Run Command.
+  No VM tags or shared network settings were changed to obtain this evidence.
+  Managed Run Command input limits are not inferred from the Action API.
+- Hardened the unexecuted publisher controller against the ARM instance-view
+  shape, creation/extension races, existing NIC/schedule conflicts and loss
+  of the original error during terminal-state reconciliation. Readiness is
+  written only after verified publication and terminal deallocation. Offline
+  fault injection covers these paths; it is not live network/agent acceptance.
