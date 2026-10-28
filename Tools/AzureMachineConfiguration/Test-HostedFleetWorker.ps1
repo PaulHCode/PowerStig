@@ -18,6 +18,7 @@ if (Test-Path -LiteralPath $OutputPath) { throw 'Use a fresh worker output direc
 . "$PSScriptRoot\AuditPackage.ps1"
 . "$PSScriptRoot\Profile.ps1"
 . "$PSScriptRoot\WorkerReportShape.ps1"
+. "$PSScriptRoot\FleetAssessmentReport.ps1"
 $stage = 'Build'
 try
 {
@@ -65,6 +66,8 @@ try
         UnexpectedReasonCount = $unexpected.Count
         NativeReportSha256 = (Get-FileHash -LiteralPath $rawPath).Hash
         Shape = $shape
+        PayloadValidated = $false
+        NativeReasonPhrasesValidated = $false
         NativeAzureReportAdmitted = $false
     }
     $summary | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath "$OutputPath\worker-summary.json" -Encoding utf8
@@ -73,6 +76,56 @@ try
     {
         throw 'Worker output did not preserve the expected incomplete baseline and complete source Reasons. Inspect the scalar-redacted shape artifact.'
     }
+    $stage = 'PayloadContract'
+    $resource = $reportObject['resources'][0]
+    if ($resource['complianceStatus'] -isnot [bool] -or $resource['complianceStatus'] -or
+        $resource['properties']['AssessmentJson'] -isnot [string])
+    {
+        throw 'Expected a noncompliant resource with the complete serialized assessment.'
+    }
+    $payload = ConvertFrom-PowerStigFleetAssessment -AssessmentJson $resource['properties']['AssessmentJson'] `
+        -CoveragePath $coveragePath -ExpectedCoverageHash $catalog[$identity.ProfileId].CoverageSha256 `
+        -ExpectedProfileId $identity.ProfileId -ExpectedFamily Windows
+    if ($payload.IsStale -or $payload.RuleCounts.Error -gt 0)
+    {
+        throw 'The worker assessment is stale or contains collector errors.'
+    }
+    $assessment = ConvertFrom-Json -InputObject $resource['properties']['AssessmentJson'] -AsHashtable -Depth 40
+    $expectedPhrases = [System.Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+    $expectedPhrases.Add('PowerStigBaseline:PowerStigBaseline:Summary',
+        "$($assessment.ProfileId): $($assessment.Status). $($assessment.Message)")
+    foreach ($rule in $payload.Requirements)
+    {
+        $phrase = "$($rule.VulnerabilityId): $($rule.Status). $($rule.Title)"
+        foreach ($check in $rule.Checks)
+        {
+            $phrase += " [$($check.Id): $($check.Status); expected=$($check.Expected); observed=$($check.Observed)]"
+        }
+        $expectedPhrases.Add("PowerStigBaseline:PowerStigBaseline:$($rule.VulnerabilityId.Replace('-', ''))", $phrase)
+    }
+    foreach ($reasons in @(
+        @{ Items = @($resource['reasons']); Code = 'code'; Phrase = 'phrase' },
+        @{ Items = @($resource['properties']['Reasons']); Code = 'Code'; Phrase = 'Phrase' }
+    ))
+    {
+        $seen = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        if ($reasons.Items.Count -ne $expectedPhrases.Count) { throw 'Native reason inventory is incomplete.' }
+        foreach ($reason in $reasons.Items)
+        {
+            $code = $reason[$reasons.Code]
+            if ($code -isnot [string] -or -not $expectedPhrases.ContainsKey($code) -or -not $seen.Add($code) -or
+                $reason[$reasons.Phrase] -cne $expectedPhrases[$code])
+            {
+                throw 'Native reason explanation differs from the validated requirement/check evidence.'
+            }
+        }
+    }
+    $summary.PayloadValidated = $true
+    $summary.NativeReasonPhrasesValidated = $true
+    $summary.PayloadStatus = $payload.PayloadStatus
+    $summary.RuleCounts = $payload.RuleCounts
+    $summary.CheckCounts = $payload.CheckCounts
+    $summary | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath "$OutputPath\worker-summary.json" -Encoding utf8
 }
 catch
 {

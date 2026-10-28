@@ -515,8 +515,7 @@ is not qualified.
   hashes and safe failure categories can be retained as artifacts.
 - Local focused tests pass164 cases, zero failed/skipped. Includes command
   shadow/version regressions, report-shape privacy/depth tests and hosted-only
-  safety gates. Actual hosted worker execution/report-mechanics acceptance is
-  pending its CI run; it is not replaced by these unit tests.
+  safety gates. These tests do not replace actual hosted worker execution.
 - A hosted worker result cannot establish private Azure delivery, exact
   VM/assignment/package/native-envelope binding or target-cloud availability.
   The lab compute hold and all004 receipts remain intact.
@@ -524,5 +523,14 @@ is not qualified.
   Isolated its module path from the PS7-only DSC authoring dependencies and
   retained source-only compile diagnostics. A fresh local surrogate Audit
   package then compiled and passed package inspection without executing an
-  assessment. The hosted worker gate is rerun against the corrected authoring
-  environment; offline164-case tests remain green.
+  assessment. Both push40703849567 and PR40703857860 passed at exact commit
+  c93082fc6ec63c57834cc3300dc8df46d5802bcc: measured Server2025 member profile,
+  239 requirements, 240 native reason codes including Summary, none missing or
+  unexpected, and Boolean noncompliance. Sanitized receipts are retained
+  privately; no raw observations were published.
+- Strengthened the hosted gate to validate the actual worker AssessmentJson
+  with the existing hash-pinned source-inventory validator and compare both
+  native reason surfaces with every complete requirement/check explanation.
+  Stale results and collector errors fail the check. This extended gate still
+  requires its own CI result; the preceding acceptance proves codes, not this
+  stronger payload/explanation contract.

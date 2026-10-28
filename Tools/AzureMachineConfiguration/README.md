@@ -322,7 +322,10 @@ No Azure credentials, lab VMs, package publication or Policy assignments are
 used by this check.
 
 The worker check expects the measured runner profile's complete source Reasons
-and a noncompliant result while manual/unsupported checks remain. Its public
+and a noncompliant result while manual/unsupported checks remain. It validates
+the worker's serialized assessment against hash-pinned source coverage, rejects
+stale/error results, and compares both native reason surfaces with every complete
+requirement/check explanation. Its public
 artifact contains only field structure, public PowerSTIG reason codes, counts,
 hashes and safe failure metadata. Raw observations/logs stay in the ephemeral
 runner and are not uploaded. `NativeAzureReportAdmitted` remains false: a local
