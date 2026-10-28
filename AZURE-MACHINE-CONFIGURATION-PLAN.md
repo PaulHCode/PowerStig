@@ -542,3 +542,16 @@ is not qualified.
   Previously retained candidate ZIPs/receipts are unchanged; those candidates
   are not eligible for publication and require a new qualified build. The
   existing publisher proposal cannot silently pick up this source change.
+- The stronger gate now passes at code commit
+  35347fab92ee65cecebbf75bd6ab4b28eb158d53 in push40705226579 and
+  PR40705238095. Actual hosted Server2025 worker output passes payload/source
+  validation and exact explanation matching on both native reason surfaces:
+  239 requirements/250 components, 240 reasons, none missing/unexpected,
+  no collector errors. Requirement reduction is17 compliant,19 noncompliant
+  and203 incomplete; component accounting is17 compliant,19 noncompliant,
+  50 manual,132 unsupported and32 organization-value-required. These are
+  ephemeral CI runner observations, not lab VM or fleet compliance.
+  All167 focused unit tests pass on Windows/Ubuntu. The retained sanitized
+  summary SHA256 is
+  74A9811DA80896C10CFE6AD058CA27C9F33EC51518C40D5CDA248781A5DCD152.
+  NativeAzureReportAdmitted remains false; no Azure writes or guest starts.

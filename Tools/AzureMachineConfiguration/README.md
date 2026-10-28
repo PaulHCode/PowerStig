@@ -334,6 +334,15 @@ The worker package is a fresh CI build, not a replacement for an approved
 immutable release. See Microsoft's
 [package-testing guidance](https://learn.microsoft.com/azure/governance/machine-configuration/how-to/develop-custom-package/3-test-package).
 
+The Server2025 hosted-worker gate has passed with all239 source requirements,
+250 components and240 native reasons accounted for, including full explanation
+matching. This qualifies that CI package/worker interaction only, not the other
+guest profiles or Azure delivery. The check exposed and corrected an adapter
+eligibility mismatch: only the exact `Registry` resource is admitted for
+effective-registry compliance; `RegistryPolicyFile` remains unsupported.
+Earlier retained package candidates are preserved but must not be published;
+the corrected source requires a new qualified build.
+
 Package creation dispatches through the exact loaded module version's command
 export. Merely importing the pinned module is insufficient when another module
 version or global command shadows it. Missing/ambiguous pinned modules and
