@@ -491,3 +491,32 @@ is not qualified.
   admission, fresh deadline-bound artifacts/current operation checks, exact
   live Debian agent/control-path proof and terminal power evidence. Normal
   Policy/native-report and target-cloud qualification gates remain open.
+
+### 2026-10-28 - Hosted worker testing and command-version isolation
+
+- The direct compute-approval question returned no affirmative authorization.
+  Continued independently without Azure writes or lab guests. All seven pinned
+  historical profiles passed actual collector-to-payload validation with mocked
+  registry/file reads: 1,829 requirements/1,955 components accounted for, with
+  no native Azure admission claim. Both candidate ZIP hashes and their embedded
+  catalog/runtime source hashes were checked before these tests.
+- Found that GuestConfiguration4.10.0 exports
+  Get-GuestConfigurationPackageComplianceStatus, not the legacy
+  Test-GuestConfigurationPackage command. Resolving the legacy name could
+  auto-load1.19.4; a globally resolved package-creation command could then use
+  that version despite4.10.0 already being loaded. Fixed package creation to
+  invoke the exact requested module's export; missing/ambiguous modules and
+  missing exports fail rather than falling back.
+- Added a bounded real-worker CI check on an ephemeral GitHub-hosted Windows
+  runner only. It builds an Audit surrogate and calls the pinned compliance
+  export without Apply/remediation. Workstation/self-hosted execution is
+  rejected. Raw stdout/stderr and observations are not uploaded to the public
+  repository; only scalar-redacted structure, source reason codes, counts,
+  hashes and safe failure categories can be retained as artifacts.
+- Local focused tests pass164 cases, zero failed/skipped. Includes command
+  shadow/version regressions, report-shape privacy/depth tests and hosted-only
+  safety gates. Actual hosted worker execution/report-mechanics acceptance is
+  pending its CI run; it is not replaced by these unit tests.
+- A hosted worker result cannot establish private Azure delivery, exact
+  VM/assignment/package/native-envelope binding or target-cloud availability.
+  The lab compute hold and all004 receipts remain intact.

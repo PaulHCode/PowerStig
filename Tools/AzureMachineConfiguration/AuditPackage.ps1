@@ -225,7 +225,7 @@ function New-PowerStigAuditPackage
         $packageParameters.Force = $true
     }
 
-    Invoke-PowerStigGuestConfigurationPackage -PackageParameters $packageParameters
+    Invoke-PowerStigGuestConfigurationPackage -PackageParameters $packageParameters -Version $GuestConfigurationVersion
 
     if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf))
     {
@@ -263,8 +263,24 @@ function Invoke-PowerStigGuestConfigurationPackage
     (
         [Parameter(Mandatory = $true)]
         [hashtable]
-        $PackageParameters
+        $PackageParameters,
+
+        [Parameter(Mandatory = $true)]
+        [ValidatePattern('^\d+\.\d+\.\d+$')]
+        [string]
+        $Version
     )
 
-    $null = New-GuestConfigurationPackage @PackageParameters
+    $modules = @(Get-Module -Name GuestConfiguration |
+        Where-Object { $_.Version -eq [version]$Version })
+    if ($modules.Count -ne 1)
+    {
+        throw "Expected exactly one loaded GuestConfiguration $Version module."
+    }
+    $command = $modules[0].ExportedCommands['New-GuestConfigurationPackage']
+    if ($command -isnot [System.Management.Automation.CommandInfo])
+    {
+        throw "GuestConfiguration $Version does not export New-GuestConfigurationPackage."
+    }
+    $null = & $command @PackageParameters
 }

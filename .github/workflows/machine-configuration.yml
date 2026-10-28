@@ -52,3 +52,57 @@ jobs:
           if ($result.Result -ne 'Passed' -or $result.SkippedCount -gt 0 -or $result.PassedCount -eq 0) {
               throw 'Machine Configuration offline validation failed or did not run completely.'
           }
+
+  windows-worker:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore pinned worker authoring tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigWorkerModules'
+          $null = New-Item -Path $toolRoot -ItemType Directory -Force
+          foreach ($dependency in @(
+                @{ Name = 'GuestConfiguration'; Version = '4.10.0' },
+                @{ Name = 'PSDesiredStateConfiguration'; Version = '2.0.7' }
+          )) {
+                Save-Module -Name $dependency.Name -RequiredVersion $dependency.Version -Path $toolRoot -Repository PSGallery -Force -ErrorAction Stop
+          }
+      - name: Test Audit package on the ephemeral runner only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolRoot = Join-Path $env:RUNNER_TEMP 'PowerStigWorkerModules'
+          $env:PSModulePath = "$toolRoot$([System.IO.Path]::PathSeparator)$env:PSModulePath"
+          $output = Join-Path $env:RUNNER_TEMP 'PowerStigWorkerRun'
+          $start = [Diagnostics.ProcessStartInfo]::new((Get-Command pwsh).Source)
+          $start.UseShellExecute = $false
+          $start.RedirectStandardOutput = $true
+          $start.RedirectStandardError = $true
+          foreach ($argument in @('-NoLogo', '-NoProfile', '-File', "$env:GITHUB_WORKSPACE\Tools\AzureMachineConfiguration\Test-HostedFleetWorker.ps1", '-OutputPath', $output)) {
+                $start.ArgumentList.Add($argument)
+          }
+          $process = [Diagnostics.Process]::Start($start)
+          $stdout = $process.StandardOutput.ReadToEndAsync()
+          $stderr = $process.StandardError.ReadToEndAsync()
+          if (-not $process.WaitForExit(480000)) {
+                $process.Kill($true)
+                throw 'Hosted worker exceeded its eight-minute bound.'
+          }
+          [IO.File]::WriteAllText("$env:RUNNER_TEMP\worker.private.stdout", $stdout.GetAwaiter().GetResult())
+          [IO.File]::WriteAllText("$env:RUNNER_TEMP\worker.private.stderr", $stderr.GetAwaiter().GetResult())
+          if ($process.ExitCode -ne 0) {
+                throw 'Hosted worker validation failed. Raw logs remain local to the ephemeral runner; inspect the scalar-redacted summary if present.'
+          }
+      - name: Retain scalar-redacted worker shape only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-worker-shape
+          path: |
+            ${{ runner.temp }}\PowerStigWorkerRun\worker-summary.json
+            ${{ runner.temp }}\PowerStigWorkerRun\worker-failure.json
+          if-no-files-found: warn
+          retention-days: 7

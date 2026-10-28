@@ -312,6 +312,30 @@ the workstation or establish guest-worker, Azure Policy or sovereign acceptance.
 The [implementation journal](../../AZURE-MACHINE-CONFIGURATION-PLAN.md#journal)
 tracks decisions, corrections, completed increments and remaining gates.
 
+The workflow also tests the real Windows worker on an ephemeral GitHub-hosted
+runner. `Test-HostedFleetWorker.ps1` refuses normal workstation/self-hosted
+execution, builds a fresh Audit-only surrogate package and invokes the
+GuestConfiguration 4.10.0 export
+`Get-GuestConfigurationPackageComplianceStatus`, never remediation/Apply.
+The child process is limited to eight minutes and the job to fifteen minutes.
+No Azure credentials, lab VMs, package publication or Policy assignments are
+used by this check.
+
+The worker check expects the measured runner profile's complete source Reasons
+and a noncompliant result while manual/unsupported checks remain. Its public
+artifact contains only field structure, public PowerSTIG reason codes, counts,
+hashes and safe failure metadata. Raw observations/logs stay in the ephemeral
+runner and are not uploaded. `NativeAzureReportAdmitted` remains false: a local
+worker result is not the Azure assignment report envelope or cloud acceptance.
+The worker package is a fresh CI build, not a replacement for an approved
+immutable release. See Microsoft's
+[package-testing guidance](https://learn.microsoft.com/azure/governance/machine-configuration/how-to/develop-custom-package/3-test-package).
+
+Package creation dispatches through the exact loaded module version's command
+export. Merely importing the pinned module is insufficient when another module
+version or global command shadows it. Missing/ambiguous pinned modules and
+missing exports fail explicitly; no older-tool fallback is used.
+
 ## Build an Audit package
 
 Compile the selected Windows PowerSTIG configuration with the pinned PowerSTIG
