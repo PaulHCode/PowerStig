@@ -91,6 +91,20 @@ try
         MissingProperty = 'property.*cannot be found|PropertyNotFound'
         InvalidArgument = 'InvalidArgument|Cannot bind|parameter.*not.*found'
         DscInfrastructure = 'PSDesiredStateConfiguration|DSC engine|Invoke-DscResource'
+        CollectorCommand = "'Get-PowerStigBaselineAssessment'.*not recognized"
+        HostDiscoveryCommand = "'Get-PowerStigMachineConfigurationHost'.*not recognized"
+        ProfileCommand = "'Resolve-PowerStigMachineConfigurationProfile'.*not recognized"
+        DscGetCommand = "'Get-TargetResource'.*not recognized"
+        DscTestCommand = "'Test-TargetResource'.*not recognized"
+        DscInvokeCommand = "'Invoke-DscResource'.*not recognized"
+        ConvertJsonCommand = "'ConvertFrom-Json'.*not recognized"
+        ContentCommand = "'Get-Content'.*not recognized"
+        ImportCommand = "'Import-Module'.*not recognized"
+        ModuleCommand = "'Get-Module'.*not recognized"
+        PlatformVariable = 'IsLinux|IsWindows'
+        RequiredRuntime = 'Assessment execution requires PowerShell 7 or later'
+        HelperSourcePath = 'Profile\.ps1|Assessment\.ps1'
+        WindowsSourcePath = 'C:\\'
     }
     $engineIndicators = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($resource in @($reportObject['resources']))
