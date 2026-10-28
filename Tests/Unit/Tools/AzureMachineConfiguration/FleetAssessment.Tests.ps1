@@ -28,6 +28,21 @@ Describe 'Portable audit adapters' {
             $result.Observed | Should -Not -BeNullOrEmpty
         }
 
+        It 'does not use a registry read to qualify an unadmitted resource variant' -TestCases @(
+            @{ Resource = 'RegistryPolicyFile' }
+            @{ Resource = 'RegistryAccessEntry' }
+            @{ Resource = 'registry' }
+        ) {
+            param ($Resource)
+            Mock Read-PowerStigRegistryValue { throw 'Unadmitted registry read.' }
+            [xml]$xml = "<DISASTIG><RegistryRule><Rule id='V-1' dscresource='$Resource' conversionstatus='pass'><Key>HKEY_LOCAL_MACHINE\Software\Example</Key><ValueName>Enabled</ValueName><ValueType>Dword</ValueType><ValueData>1</ValueData></Rule></RegistryRule></DISASTIG>"
+            $result = Invoke-PowerStigProcessedCheck -Rule $xml.SelectSingleNode('//Rule') -Family Windows
+            $result.Status | Should -BeExactly 'Unsupported'
+            $result.Adapter | Should -BeNullOrEmpty
+            $result.Observed | Should -BeLike "*$Resource*"
+            Should -Invoke Read-PowerStigRegistryValue -Times 0 -Exactly
+        }
+
         It 'returns partial evidence, not effective-system compliance, for a matching Linux file line' {
             Mock Read-PowerStigTextFile { @{ State = 'Present'; Text = "setting=1`n" } }
             [xml]$xml = '<DISASTIG><nxFileLineRule><Rule id="V-1" dscresource="nxFileLine" conversionstatus="pass"><FilePath>/etc/example.conf</FilePath><ContainsLine>setting=1</ContainsLine><DoesNotContainPattern>PatternNotRequired</DoesNotContainPattern></Rule></nxFileLineRule></DISASTIG>'

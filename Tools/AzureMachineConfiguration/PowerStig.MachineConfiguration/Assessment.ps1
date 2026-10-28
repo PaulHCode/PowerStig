@@ -100,7 +100,8 @@ function Invoke-PowerStigProcessedCheck
         $result.Expected = 'Explicitly approved organization-specific values.'
         $result.Observed = 'No organization value is substituted from an example/default.'
     }
-    elseif ($Family -ceq 'Windows' -and $Rule.ParentNode.LocalName -ceq 'RegistryRule')
+    elseif ($Family -ceq 'Windows' -and $Rule.ParentNode.LocalName -ceq 'RegistryRule' -and
+        $Rule.GetAttribute('dscresource') -ceq 'Registry')
     {
         $result.Adapter = 'EffectiveMachineRegistry'
         $result.Expected = "$($Rule.Key)\$($Rule.ValueName) [$($Rule.ValueType)] = $($Rule.ValueData)"

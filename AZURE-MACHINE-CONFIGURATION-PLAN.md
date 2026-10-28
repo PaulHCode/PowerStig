@@ -534,3 +534,11 @@ is not qualified.
   Stale results and collector errors fail the check. This extended gate still
   requires its own CI result; the preceding acceptance proves codes, not this
   stronger payload/explanation contract.
+- That stronger check failed correctly at the source-component eligibility
+  boundary: RegistryRule also contains RegistryPolicyFile components, but only
+  the exact Registry resource is admitted for effective-registry compliance.
+  Restricted the collector to that exact resource, preserving Unsupported for
+  the other variants without reading them. Added three regression cases.
+  Previously retained candidate ZIPs/receipts are unchanged; those candidates
+  are not eligible for publication and require a new qualified build. The
+  existing publisher proposal cannot silently pick up this source change.
