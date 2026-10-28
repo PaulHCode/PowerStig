@@ -77,12 +77,20 @@ try
 catch
 {
     if (-not (Test-Path -LiteralPath $OutputPath)) { $null = New-Item -Path $OutputPath -ItemType Directory }
-    [ordered]@{
+    $failure = [ordered]@{
         Stage = $stage
         ExceptionType = $_.Exception.GetType().FullName
         Category = $_.CategoryInfo.Category.ToString()
         SourceFile = [IO.Path]::GetFileName($_.InvocationInfo.ScriptName)
         SourceLine = $_.InvocationInfo.ScriptLineNumber
-    } | ConvertTo-Json | Set-Content -LiteralPath "$OutputPath\worker-failure.json" -Encoding utf8
+    }
+    $compileLog = "$OutputPath\PowerStigFleetWindows.compile.log"
+    if ($stage -ceq 'Build' -and (Test-Path -LiteralPath $compileLog))
+    {
+        # Compilation precedes collection; this diagnostic contains authoring output only.
+        $compileText = Get-Content -LiteralPath $compileLog -Raw
+        $failure.CompileDiagnostics = $compileText.Substring(0, [Math]::Min(16384, $compileText.Length))
+    }
+    $failure | ConvertTo-Json | Set-Content -LiteralPath "$OutputPath\worker-failure.json" -Encoding utf8
     throw
 }

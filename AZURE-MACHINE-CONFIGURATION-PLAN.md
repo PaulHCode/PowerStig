@@ -520,3 +520,9 @@ is not qualified.
 - A hosted worker result cannot establish private Azure delivery, exact
   VM/assignment/package/native-envelope binding or target-cloud availability.
   The lab compute hold and all004 receipts remain intact.
+- The first hosted runs stopped at Windows PowerShell MOF compilation.
+  Isolated its module path from the PS7-only DSC authoring dependencies and
+  retained source-only compile diagnostics. A fresh local surrogate Audit
+  package then compiled and passed package inspection without executing an
+  assessment. The hosted worker gate is rerun against the corrected authoring
+  environment; offline164-case tests remain green.

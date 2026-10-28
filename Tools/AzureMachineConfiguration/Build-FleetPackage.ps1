@@ -97,8 +97,20 @@ try
             "$name -OutputPath '$escapedMofDirectory'"
         )
         $compile | Set-Content -LiteralPath $compileScript -Encoding utf8
-        & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -File $compileScript
-        if ($LASTEXITCODE -ne 0) { throw "MOF compilation failed for $targetFamily." }
+        $authoringModulePath = $env:PSModulePath
+        try
+        {
+            # Windows PowerShell must not discover the PS7-only DSC authoring module.
+            $env:PSModulePath = "$moduleParent;$env:SystemRoot\System32\WindowsPowerShell\v1.0\Modules"
+            $compileOutput = & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -File $compileScript 2>&1
+            $compileExitCode = $LASTEXITCODE
+        }
+        finally
+        {
+            $env:PSModulePath = $authoringModulePath
+        }
+        $compileOutput | Out-String | Set-Content -LiteralPath (Join-Path $output "$name.compile.log") -Encoding utf8
+        if ($compileExitCode -ne 0) { throw "MOF compilation failed for $targetFamily; inspect the retained compile log." }
         $package = New-PowerStigAuditPackage -Name $name `
             -ConfigurationMofPath (Join-Path $mofDirectory 'localhost.mof') `
             -OutputPath $output -PackageVersion '0.2.0'
