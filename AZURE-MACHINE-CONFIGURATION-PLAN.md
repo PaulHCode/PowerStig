@@ -374,3 +374,44 @@ is not qualified.
   workflows. `gh pr checks 1 --repo PaulHCode/PowerStig --watch --interval 10`
   completed successfully; PR run `40600341154` reports success for the exact
   commit. No merge or approval was performed.
+
+### 2026-10-28 - Candidate dispatchers and private-only deployment iteration
+
+- Built candidate Windows/Linux Audit 0.2.0 packages with a shared measured-OS
+  dispatcher and read-only adapters. Windows reads effective registry values;
+  Linux static file matches remain partial evidence, not effective-system
+  compliance. Every archived source requirement remains in the denominator.
+  Unsupported releases/DCs fail closed. These historical profiles are not
+  current-benchmark or cross-cloud qualification.
+- The new class resource returns structured assessment data and per-requirement
+  Reasons. The original multi-instance report reader must not be used blindly
+  for the single-resource fleet report. Native report admission is outstanding.
+- Live preflight found the previous supporting deployment absent following a
+  coordinator-reported retention incident. Historical package/network receipts
+  were not reused as current readiness. Recreated the dedicated support group
+  with a publisher-only managed identity and CanNotDelete evidence-retention
+  lock; no deletes or cleanup were performed.
+- Deployed and ARM-verified private-only storage, a dedicated approved blob
+  private endpoint and its DNS zone group. Existing subnet/zone/link are
+  references, not redeclared resources. The assessed VM receives container-only
+  Reader; the separate publisher identity receives container-only Contributor.
+  PNA Disabled, firewall Deny/bypass None, no IP/VNet allowances, no keys/public
+  blobs and no NSP publishing exception are explicit and were read back.
+- The workstation has no proven private publishing route. Prepared an isolated
+  no-PIP Debian utility publisher rather than using existing TLS/Ubuntu guests.
+  Its production analogue is an approved private-connected build agent.
+  ARM/Entra/agent management traffic is not thereby proved to use Private Link.
+- Rejected oversized one-shot Run Command staging before execution. Prepared
+  exactly eight hash-checked 128-KiB binary chunks and one final publication
+  command, each below conservative source/request limits. Offline reconstruction
+  matched both ZIP hashes. The controller checks immutable requests, an absolute
+  shutdown deadline, bounded call count/bytes/time and final deallocation.
+  A stale daily shutdown time is rejected rather than rolling into the next day.
+- The full focused Pester suite passes 93 tests with zero failed/skipped.
+  Private publisher DNS/hash rejection and create-only publication behavior
+  were also checked offline. ARM validation and What-If passed each deployed
+  phase, with no Modify/Delete. Raw tenant evidence and parameters remain private.
+- Guest starts, utility publishing, native full reports and normal Policy
+  delivery remain separate bounded acceptance gates. Reconcile current guest
+  reservations and cumulative power before any start; no overall status alone
+  qualifies this candidate for fleet or sovereign-cloud use.

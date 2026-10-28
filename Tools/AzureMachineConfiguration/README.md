@@ -22,10 +22,12 @@ share a kernel build. Ubuntu releases are exact matches; RHEL minor versions
 map to their major-release benchmark. Derivatives such as Rocky Linux do not
 silently inherit a RHEL profile.
 
-**Implementation status:** the identity, coverage, resource-map, report and
-initiative helpers below are available for offline development. They are not yet
-wired into distributable guest dispatcher packages. No OS/cloud combination is
-production-qualified by these helpers. In particular, do not assign an existing
+**Implementation status:** `Build-FleetPackage.ps1` builds candidate Windows and
+Linux Audit 0.2.0 dispatchers using the included class resource. The adapters
+measure a limited subset of checks; manual, unsupported, organization-specific,
+conversion-failed and partial evidence remain explicit. Native worker execution,
+normal Policy delivery and OS/cloud qualification remain release gates.
+In particular, do not assign an existing
 Server 2022 composite package to every Windows VM: the generic policy generator
 targets an OS family, not that package's exact release. A fleet assignment needs
 the guest dispatcher and profile-admission gates first.
@@ -68,6 +70,13 @@ components under their source vulnerability. Unmapped helper resources remain
 visible and require explicit review.
 
 ## Native reports with explanations
+
+The fleet candidates return one `PowerStigBaseline` DSC resource with structured
+`AssessmentJson` and per-requirement native Reasons. The existing report reader
+below maps **per-control DSC instances**; it is not a fleet-dispatcher parser.
+Do not treat its resource-map output as admission of the single-resource fleet
+report. Retain the full native report and verify its embedded assessment against
+the exact source inventory before making a fleet coverage/compliance claim.
 
 `ConvertFrom-PowerStigMachineConfigurationReport` accepts the **full native
 assignment report** and the corresponding assignment, loaded as hashtables.
@@ -136,6 +145,45 @@ subscription or resource-group scope. Use separate prerequisite onboarding for
 VM identity, the Machine Configuration extension and package read access.
 
 ## Cloud and operational qualification
+
+### Private-only artifact delivery
+
+Use the ordinary HTTPS blob endpoint returned by ARM, with private DNS resolving
+it to the approved blob private endpoint. Both the publishing host and assessed
+VM need private routing and DNS; a private container alone is not network
+isolation, and a private endpoint alone does not give a workstation a route.
+
+The lab templates under `infra` separate identity, hosting, the blob private
+endpoint and an isolated utility publisher. Storage explicitly disables public
+network access, shared-key authorization and anonymous blobs; its firewall
+defaults to Deny with no bypass, IP rules or service-endpoint allowances. No NSP
+public publishing exception is part of this design. Grant assessed VM identities
+only Storage Blob Data Reader on the packages container. Give a separate
+publisher-only managed identity Storage Blob Data Contributor on that container,
+not the storage account/subscription and not the assessed guest.
+
+For production, publish from an approved private-connected build agent. The lab
+utility uses a pinned Debian image, no public IP/password, an identity-first
+deployment and explicit power/shutdown guards. Validate the actual new identity
+and exact role scope before provisioning compute. Managed Run Command staging
+is a **management-plane** transport, not a storage private endpoint; never copy
+operator credentials to the guest. Stage artifacts in bounded, hash-checked
+chunks rather than embedding large ZIPs in one inline script. Preserve part
+receipts, final package hash, private DNS/TLS evidence and terminal power state.
+
+Use version/hash-addressed blob names, create-only publication and authenticated
+download/re-hash before assigning Policy. Reject a public DNS result or a
+different TLS peer rather than falling back to a public allowance. Preserve
+resources/evidence; a lab CanNotDelete lock is supplementary protection, not
+permission to remove resources later. Refresh absolute shutdown deadlines
+immediately before a bounded run: a stale daily `HHmm` value can otherwise
+schedule shutdown on the following day.
+
+Private package delivery does not establish that ARM, Entra, extension delivery
+or the Machine Configuration service control plane uses Private Link. Review
+each service's supported network requirements in the target cloud. If production
+requires every one of those connections to be private, that is an additional
+qualification gate, not a promise made by these storage templates.
 
 | Environment | Required evidence | Current qualification |
 | --- | --- | --- |
