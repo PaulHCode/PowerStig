@@ -461,3 +461,33 @@ is not qualified.
   passed, 138 tests with zero failed/skipped. Includes 45 new payload cases and
   actual collector serialization with mocked registry reads; it is not a
   guest execution or native service report test.
+
+### 2026-10-28 - Full-window publisher admission, offline only
+
+- Continued PowerStig work independently of the separate TLS solution. Existing
+  no-TLS/no-Ubuntu guest boundaries and the publisher004 NO-GO remain intact.
+  No new deployment deadline, slot, parameter manifest or What-If was generated.
+- Preserved the reviewed controller/transport and all004 artifacts. Created a
+  separate private controller candidate; its timing helper is hash-checked
+  before loading. The old004 manifest cannot admit this candidate.
+- Replaced the permissive startup window with full-window admission at startup
+  and immediately before creation, after read-only preflight. Also recheck
+  after blocking extension/VM/chunk reads before continuing subsequent work.
+  An aged preflight cannot silently renew the fixed deadline.
+- The cleanup reserve includes more than its five-minute polling loop:
+  three outer 60-second CLI calls plus one final poll sleep/read overrun make
+  9m10s. Adding the existing 18-minute collection cutoff (including
+  provisioning), a 1m10s in-flight allowance and 40 seconds for transitions
+  requires 29 minutes, within the unchanged 30-minute utility ceiling.
+  These are conservative local bounds, not a guarantee of backend completion.
+- The new public timing helper passes 15 exact-boundary/invalid-clock cases.
+  The full focused suite passes 153 tests, zero failed/skipped. Separate
+  private mock tests pass all22 cases, including all earlier fault paths,
+  timing-helper drift, aged preflight, late extension/VM/chunk results and
+  AST checks tying CLI/sleep bounds to the timing model. NUnit receipts are
+  retained privately. These tests invoke only the mock Azure helper.
+- No Azure write, compute start, Managed Run Command or package publication
+  occurred. Future execution still needs independently authorized exclusive
+  admission, fresh deadline-bound artifacts/current operation checks, exact
+  live Debian agent/control-path proof and terminal power evidence. Normal
+  Policy/native-report and target-cloud qualification gates remain open.

@@ -271,6 +271,28 @@ Preserve before/after ARM state, full native results and errors privately.
 Restore/deallocate only the exact VMs started for the agreed test; do not delete
 shared lab resources as cleanup.
 
+`PublisherTiming.ps1` provides offline admission/collection assertions for the
+bounded lab publisher controller. A five-minute **polling loop** is not a
+five-minute end-to-end cleanup allowance: the initial VM read, deallocate
+request and final deployment read each have a 60-second CLI timeout, and the
+last poll can overrun by its ten-second sleep plus a 60-second read.
+
+The timing model reserves 18 minutes for collection **including provisioning**,
+9m10s for that complete cleanup path, 1m10s for an in-flight call/sleep and
+40 seconds for transitions: a minimum 29-minute admission window, within the
+existing 30-minute utility-VM ceiling. Check admission at startup and again
+immediately before creation after read-only preflight. Collection must stop at
+18 minutes or earlier to preserve cleanup/in-flight/transition reserves.
+Recheck after blocking reads before submitting subsequent work. If timeouts or
+polling behavior change, update the model and its regression cases together.
+
+These are conservative local admission checks, not a guarantee of Azure
+backend completion or permission to create/start a VM. Terminal ARM power and
+deployment evidence is still required; reconciliation failures must remain
+explicit and withhold readiness. A future reservation must be independently
+authorized. The held publisher proposal cannot be renewed by passing this
+helper, and no new deadline/slot is created by the offline tests.
+
 Release gates remain: current source coverage and tailoring review; pinned
 offline dependencies; Audit-only artifact inspection; guest runtime execution;
 per-rule native explanations; Policy delivery and OS/DC targeting; freshness;
