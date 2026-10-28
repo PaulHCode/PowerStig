@@ -1,0 +1,175 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": { "type": "string", "defaultValue": "rg-powerstig-mc-lab" },
+    "location": { "type": "string", "defaultValue": "centralus" },
+    "subnetId": { "type": "string" },
+    "sshPublicKey": { "type": "string" },
+    "imageVersion": { "type": "string" },
+    "publisherIdentityId": { "type": "string" },
+    "vmName": { "type": "string", "defaultValue": "vm-powerstig-publisher" },
+    "vmSize": { "type": "string", "defaultValue": "Standard_B2s" },
+    "shutdownTimeUtc": { "type": "string", "minLength": 4, "maxLength": 4 },
+    "shutdownDeadlineUtc": { "type": "string" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('resourceGroupName')]",
+      "location": "[parameters('location')]",
+      "tags": { "purpose": "PowerSTIG Machine Configuration audit lab" }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "powerstig-private-publisher",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "dependsOn": ["[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"],
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "parameters": {
+          "location": { "value": "[parameters('location')]" },
+          "subnetId": { "value": "[parameters('subnetId')]" },
+          "sshPublicKey": { "value": "[parameters('sshPublicKey')]" },
+          "imageVersion": { "value": "[parameters('imageVersion')]" },
+          "publisherIdentityId": { "value": "[parameters('publisherIdentityId')]" },
+          "vmName": { "value": "[parameters('vmName')]" },
+          "vmSize": { "value": "[parameters('vmSize')]" },
+          "shutdownTimeUtc": { "value": "[parameters('shutdownTimeUtc')]" },
+          "shutdownDeadlineUtc": { "value": "[parameters('shutdownDeadlineUtc')]" }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "location": { "type": "string" },
+            "subnetId": { "type": "string" },
+            "sshPublicKey": { "type": "string" },
+            "imageVersion": { "type": "string" },
+            "publisherIdentityId": { "type": "string" },
+            "vmName": { "type": "string" },
+            "vmSize": { "type": "string" },
+            "shutdownTimeUtc": { "type": "string" },
+            "shutdownDeadlineUtc": { "type": "string" }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Network/networkInterfaces",
+              "apiVersion": "2024-05-01",
+              "name": "[format('{0}-nic', parameters('vmName'))]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "ipConfigurations": [
+                  {
+                    "name": "private",
+                    "properties": {
+                      "privateIPAllocationMethod": "Dynamic",
+                      "subnet": { "id": "[parameters('subnetId')]" }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Compute/virtualMachines",
+              "apiVersion": "2024-07-01",
+              "name": "[parameters('vmName')]",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": { "[parameters('publisherIdentityId')]": {} }
+              },
+              "tags": {
+                "purpose": "Private-only immutable package publisher",
+                "deleteRequiresExplicitUserApproval": "true",
+                "maximumRunningMinutesApproved": "30",
+                "runningDeadlineUtc": "[parameters('shutdownDeadlineUtc')]"
+              },
+              "dependsOn": ["[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('vmName')))]"],
+              "properties": {
+                "hardwareProfile": { "vmSize": "[parameters('vmSize')]" },
+                "storageProfile": {
+                  "imageReference": {
+                    "publisher": "Debian",
+                    "offer": "debian-12",
+                    "sku": "12-gen2",
+                    "version": "[parameters('imageVersion')]"
+                  },
+                  "osDisk": {
+                    "createOption": "FromImage",
+                    "deleteOption": "Detach",
+                    "managedDisk": { "storageAccountType": "Standard_LRS" }
+                  }
+                },
+                "osProfile": {
+                  "computerName": "[parameters('vmName')]",
+                  "adminUsername": "publisher",
+                  "linuxConfiguration": {
+                    "disablePasswordAuthentication": true,
+                    "provisionVMAgent": true,
+                    "ssh": {
+                      "publicKeys": [
+                        { "path": "/home/publisher/.ssh/authorized_keys", "keyData": "[parameters('sshPublicKey')]" }
+                      ]
+                    }
+                  }
+                },
+                "securityProfile": {
+                  "securityType": "TrustedLaunch",
+                  "uefiSettings": { "secureBootEnabled": true, "vTpmEnabled": true }
+                },
+                "networkProfile": {
+                  "networkInterfaces": [
+                    {
+                      "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}-nic', parameters('vmName')))]",
+                      "properties": { "deleteOption": "Detach" }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "Microsoft.DevTestLab/schedules",
+              "apiVersion": "2018-09-15",
+              "name": "[format('shutdown-computevm-{0}', parameters('vmName'))]",
+              "location": "[parameters('location')]",
+              "dependsOn": ["[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"],
+              "properties": {
+                "status": "Enabled",
+                "taskType": "ComputeVmShutdownTask",
+                "dailyRecurrence": { "time": "[parameters('shutdownTimeUtc')]" },
+                "timeZoneId": "UTC",
+                "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]",
+                "notificationSettings": { "status": "Disabled", "timeInMinutes": 5 }
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/locks",
+              "apiVersion": "2020-05-01",
+              "name": "preserve-powerstig-evidence",
+              "properties": {
+                "level": "CanNotDelete",
+                "notes": "Retain lab resources and evidence until the user explicitly authorizes deletion."
+              }
+            }
+          ],
+          "outputs": {
+            "publisherVmId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "publisherVmId": {
+      "type": "string",
+      "value": "[reference('powerstig-private-publisher').outputs.publisherVmId.value]"
+    }
+  }
+}

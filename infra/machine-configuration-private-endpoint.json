@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "type": "string" },
+    "privateEndpointName": { "type": "string", "defaultValue": "pe-powerstig-mc-packages" },
+    "networkInterfaceName": { "type": "string", "defaultValue": "nic-powerstig-mc-packages" },
+    "storageAccountId": { "type": "string" },
+    "subnetId": { "type": "string" },
+    "privateDnsZoneId": { "type": "string" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-05-01",
+      "name": "[parameters('privateEndpointName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "customNetworkInterfaceName": "[parameters('networkInterfaceName')]",
+        "subnet": { "id": "[parameters('subnetId')]" },
+        "privateLinkServiceConnections": [
+          {
+            "name": "powerstig-package-blobs",
+            "properties": {
+              "privateLinkServiceId": "[parameters('storageAccountId')]",
+              "groupIds": ["blob"]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-05-01",
+      "name": "[format('{0}/blob', parameters('privateEndpointName'))]",
+      "dependsOn": ["[resourceId('Microsoft.Network/privateEndpoints', parameters('privateEndpointName'))]"],
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "blob",
+            "properties": { "privateDnsZoneId": "[parameters('privateDnsZoneId')]" }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "privateEndpointId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/privateEndpoints', parameters('privateEndpointName'))]"
+    }
+  }
+}

@@ -110,6 +110,15 @@ This module generates a checklist, but we are not 100% sure on the workflow, so 
 
 For detailed information, please see the [Document Wiki](https://github.com/Microsoft/PowerStig/wiki/Document)
 
+## Azure Policy Machine Configuration
+
+The [Machine Configuration integration](Tools/AzureMachineConfiguration/README.md)
+provides Audit package/policy tooling and foundations for one initiative with
+measured Windows/Linux profile selection, member-server-only Windows targeting,
+source coverage accounting and per-rule native report explanations.
+Cross-platform guest dispatchers and cloud qualification are still in development;
+the existing Linux `nx` composites are not Machine Configuration-compatible.
+
 ## Contributing
 
 We welcome all contributions to the development of PowerStig.

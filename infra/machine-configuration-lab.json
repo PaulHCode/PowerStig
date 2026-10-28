@@ -1,0 +1,114 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": { "type": "string", "defaultValue": "rg-powerstig-mc-lab" },
+    "location": { "type": "string", "defaultValue": "centralus" },
+    "storageAccountName": { "type": "string", "minLength": 3, "maxLength": 24 },
+    "readerPrincipalIds": { "type": "array", "defaultValue": [] },
+    "publisherPrincipalId": { "type": "string" },
+    "publisherPrincipalType": { "type": "string", "defaultValue": "ServicePrincipal", "allowedValues": ["ServicePrincipal"] }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('resourceGroupName')]",
+      "location": "[parameters('location')]",
+      "tags": { "purpose": "PowerSTIG Machine Configuration audit lab" }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "powerstig-artifact-hosting",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "dependsOn": ["[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"],
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "parameters": {
+          "location": { "value": "[parameters('location')]" },
+          "storageAccountName": { "value": "[parameters('storageAccountName')]" },
+          "readerPrincipalIds": { "value": "[parameters('readerPrincipalIds')]" },
+          "publisherPrincipalId": { "value": "[parameters('publisherPrincipalId')]" },
+          "publisherPrincipalType": { "value": "[parameters('publisherPrincipalType')]" }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {
+            "location": { "type": "string" },
+            "storageAccountName": { "type": "string" },
+            "readerPrincipalIds": { "type": "array" },
+            "publisherPrincipalId": { "type": "string" },
+            "publisherPrincipalType": { "type": "string" }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('storageAccountName')]",
+              "location": "[parameters('location')]",
+              "kind": "StorageV2",
+              "sku": { "name": "Standard_LRS" },
+              "properties": {
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true,
+                "allowBlobPublicAccess": false,
+                "allowSharedKeyAccess": false,
+                "defaultToOAuthAuthentication": true,
+                "publicNetworkAccess": "Disabled",
+                "networkAcls": { "defaultAction": "Deny", "bypass": "None", "ipRules": [], "virtualNetworkRules": [] }
+              }
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/default', parameters('storageAccountName'))]",
+              "dependsOn": ["[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"],
+              "properties": { "isVersioningEnabled": true }
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/default/packages', parameters('storageAccountName'))]",
+              "dependsOn": ["[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"],
+              "properties": { "publicAccess": "None" }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageAccountName'), 'default', 'packages'), parameters('readerPrincipalIds')[copyIndex()], 'reader')]",
+              "scope": "[format('Microsoft.Storage/storageAccounts/{0}/blobServices/default/containers/packages', parameters('storageAccountName'))]",
+              "copy": { "name": "packageReaders", "count": "[length(parameters('readerPrincipalIds'))]" },
+              "dependsOn": ["[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageAccountName'), 'default', 'packages')]"],
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1')]",
+                "principalId": "[parameters('readerPrincipalIds')[copyIndex()]]",
+                "principalType": "ServicePrincipal"
+              }
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageAccountName'), 'default', 'packages'), parameters('publisherPrincipalId'), 'publisher')]",
+              "scope": "[format('Microsoft.Storage/storageAccounts/{0}/blobServices/default/containers/packages', parameters('storageAccountName'))]",
+              "dependsOn": ["[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageAccountName'), 'default', 'packages')]"],
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')]",
+                "principalId": "[parameters('publisherPrincipalId')]",
+                "principalType": "[parameters('publisherPrincipalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "blobEndpoint": { "type": "string", "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-05-01').primaryEndpoints.blob]" }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "blobEndpoint": { "type": "string", "value": "[reference('powerstig-artifact-hosting').outputs.blobEndpoint.value]" }
+  }
+}

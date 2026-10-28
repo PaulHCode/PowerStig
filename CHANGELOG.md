@@ -1,6 +1,9 @@
 # Versions
 
 ## [Unreleased]
+- Hardened Machine Configuration Audit policy admission to require the exact Policy-derived assignment name and conjunctive compliance, configuration name, version and package hash conditions, preventing unrelated compliant assignments from satisfying the generated definition.
+- Added offline Machine Configuration foundations for exact guest OS/profile identification (excluding domain controllers), source-bound coverage with split-rule accounting, compiled resource mapping, native per-rule report interpretation, and a two-family custom initiative. These do not yet provide qualified guest dispatcher packages.
+- Added Windows-first helpers to build and validate Audit-only Azure Machine Configuration packages from compiled PowerSTIG MOFs and generate/validate matching local `auditIfNotExists` policy definitions.
 
 ## [4.30.0] - 2026-06-19
 

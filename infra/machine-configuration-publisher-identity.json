@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "resourceGroupName": { "type": "string", "defaultValue": "rg-powerstig-mc-lab" },
+    "location": { "type": "string", "defaultValue": "centralus" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('resourceGroupName')]",
+      "location": "[parameters('location')]",
+      "tags": { "purpose": "PowerSTIG Machine Configuration audit lab" }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "powerstig-publisher-identity",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "dependsOn": ["[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"],
+      "properties": {
+        "mode": "Incremental",
+        "expressionEvaluationOptions": { "scope": "inner" },
+        "parameters": { "location": { "value": "[parameters('location')]" } },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": { "location": { "type": "string" } },
+          "resources": [
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2023-01-31",
+              "name": "id-powerstig-publisher",
+              "location": "[parameters('location')]"
+            },
+            {
+              "type": "Microsoft.Authorization/locks",
+              "apiVersion": "2020-05-01",
+              "name": "preserve-powerstig-evidence",
+              "properties": {
+                "level": "CanNotDelete",
+                "notes": "Retain lab resources and evidence until the user explicitly authorizes deletion."
+              }
+            }
+          ],
+          "outputs": {
+            "publisherPrincipalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', 'id-powerstig-publisher'), '2023-01-31').principalId]"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "publisherPrincipalId": {
+      "type": "string",
+      "value": "[reference('powerstig-publisher-identity').outputs.publisherPrincipalId.value]"
+    }
+  }
+}
