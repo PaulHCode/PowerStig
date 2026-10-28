@@ -78,6 +78,51 @@ Do not treat its resource-map output as admission of the single-resource fleet
 report. Retain the full native report and verify its embedded assessment against
 the exact source inventory before making a fleet coverage/compliance claim.
 
+### Fleet assessment payloads (offline validation only)
+
+`ConvertFrom-PowerStigFleetAssessment` validates an extracted `AssessmentJson`
+payload against the exact hash-pinned coverage inventory. It checks the
+consistency of reported host facts/profile, source metadata, every requirement
+and split component, explanations, timestamps and status reductions. It keeps
+manual/unsupported/partial checks separate from reported failing checks.
+Static Linux evidence and ineligible source components cannot become passes.
+
+Use PowerShell 7 or later. Obtain the catalog and coverage from an independently
+hash-verified approved package; do not generate the expected coverage hash from
+the same untrusted file being admitted.
+
+```powershell
+. .\Tools\AzureMachineConfiguration\FleetAssessmentReport.ps1
+$catalog = Get-Content '<approved extracted catalog>.json' -Raw | ConvertFrom-Json -AsHashtable
+$parameters = @{
+    AssessmentJson       = Get-Content '<extracted AssessmentJson payload>.json' -Raw
+    CoveragePath         = '<approved extracted WindowsClient-11.coverage.json>'
+    ExpectedCoverageHash = $catalog['WindowsClient-11'].CoverageSha256
+    ExpectedProfileId    = 'WindowsClient-11'
+    ExpectedFamily       = 'Windows'
+    MaximumAgeMinutes    = 60
+}
+$payload = ConvertFrom-PowerStigFleetAssessment @parameters
+$payload.RuleCounts
+$payload.CheckCounts
+$payload.Requirements.Checks | Select-Object Id, Status, Expected, Observed
+```
+
+`PayloadStatus` is `Compliant`, `NonCompliant`, `Incomplete`, `Error` or `Stale`,
+with stale results taking precedence. A result exactly at the age limit is
+fresh. Invalid/future timestamps, inventory/hash/profile mismatches and
+contradictory statuses throw rather than returning a success-shaped fallback.
+Payloads are limited to 16 MiB and coverage files to 20 MiB.
+
+**This is not native report admission.** `NativeReportAdmitted` is always
+`false`, even for a fully compliant payload. Reported host facts are not
+independently attested by this function. It neither extracts a payload from an
+unqualified native report shape nor verifies the VM, assignment, package or
+native Reasons envelope. Those fleet acceptance gates remain open. No payload
+status alone establishes Azure Policy compliance or release/cloud qualification.
+
+### Per-control native reports
+
 `ConvertFrom-PowerStigMachineConfigurationReport` accepts the **full native
 assignment report** and the corresponding assignment, loaded as hashtables.
 Supply expected VM/assignment IDs, package name/version/hash, pinned benchmark

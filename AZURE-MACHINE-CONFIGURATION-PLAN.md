@@ -427,3 +427,37 @@ is not qualified.
   of the original error during terminal-state reconciliation. Readiness is
   written only after verified publication and terminal deallocation. Offline
   fault injection covers these paths; it is not live network/agent acceptance.
+
+### 2026-10-28 - Publisher hold and source-inventory payload validation
+
+- Publisher proposal 004 is NO-GO. Its absolute deadline did not leave the full
+  collection/deallocation reservation plus admission/provisioning latency.
+  Successful validation/What-If did not authorize execution. No publisher
+  create/start or Managed Run Command was performed; retained evidence is not
+  overwritten. A future attempt needs fresh deadline-bound artifacts, review
+  and exclusive admission. Remaining per-VM budget does not renew a slot.
+- Added a host-side fleet `AssessmentJson` validator, separate from the existing
+  per-control native report reader. It checks hash-pinned coverage, reported
+  identity consistency, complete requirement/component accounting, source
+  metadata, expected/observed explanations, freshness and status reductions.
+  Manual, organization-dependent, conversion-failed, duplicate, static Linux
+  and unknown source states cannot be promoted to passes.
+- Fixed timestamp admission to preserve the absolute instant when PowerShell
+  JSON deserialization produces a DateTime. Converting that value back to a
+  culture-formatted string had lost its UTC offset. Regression cases cover
+  offset-bearing timestamps, local culture, future/offsetless values and the
+  exact freshness boundary.
+- Offline synthetic payloads using the pinned candidate inventories retained
+  all 262 Windows 11 requirements/282 components and all 446 RHEL 9
+  requirements/481 components. Both remained Incomplete with no guest
+  collection or native report admission. Private receipts distinguish these
+  synthetic results from live evidence.
+- The helper always returns `NativeReportAdmitted=false`. Exact VM/assignment/
+  package/native-Reasons binding, private publication, normal Policy delivery
+  and sovereign-cloud qualification remain unverified. Compute remains held;
+  no TLS/Ubuntu guests or shared network resources were used.
+- `Import-Module Pester -RequiredVersion 5.3.1; Invoke-Pester -Path
+  .\Tests\Unit\Tools\AzureMachineConfiguration -Output Normal -PassThru`:
+  passed, 138 tests with zero failed/skipped. Includes 45 new payload cases and
+  actual collector serialization with mocked registry reads; it is not a
+  guest execution or native service report test.
