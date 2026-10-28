@@ -105,6 +105,15 @@ try
         RequiredRuntime = 'Assessment execution requires PowerShell 7 or later'
         HelperSourcePath = 'Profile\.ps1|Assessment\.ps1'
         WindowsSourcePath = 'C:\\'
+        DscDiscoveryCommand = 'Get-DscResource'
+        TargetGetCommand = 'Get-TargetResource'
+        TargetTestCommand = 'Test-TargetResource'
+        CollectorMention = 'Get-PowerStigBaselineAssessment'
+        HostDiscoveryMention = 'Get-PowerStigMachineConfigurationHost'
+        ProfileMention = 'Resolve-PowerStigMachineConfigurationProfile'
+        PowerShellExecutable = 'pwsh|powershell\.exe'
+        PowerShellModulePath = 'PSModulePath'
+        RuntimeLibrary = 'libmi|libpsrp|libicu|hostfxr|hostpolicy'
     }
     $engineIndicators = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
     foreach ($resource in @($reportObject['resources']))
